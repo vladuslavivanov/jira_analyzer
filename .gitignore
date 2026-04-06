@@ -1,0 +1,6 @@
+.env
+data/output.json
+__pycache__/
+*.pyc
+logs/
+.idea/
