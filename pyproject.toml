@@ -10,3 +10,19 @@ dependencies = [
     "openai>=2.31.0",
     "python-dotenv>=1.2.2",
 ]
+
+[dependency-groups]
+dev = [
+    {include-group = "test"},
+    {include-group = "lint"}
+]
+check = [
+    {include-group = "test"},
+    {include-group = "lint"}
+]
+lint = [
+    "ruff>=0.15.10",
+]
+test = [
+    "pytest>=9.0.3",
+]
