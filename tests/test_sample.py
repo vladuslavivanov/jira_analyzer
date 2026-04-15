@@ -4,7 +4,6 @@ This file serves as a template for writing tests in the jira_analyzer project.
 """
 
 import pytest
-from pathlib import Path
 
 
 # Basic test example
