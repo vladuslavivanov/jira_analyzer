@@ -1,10 +1,17 @@
 import argparse
+from pathlib import Path
 import sys
 from jira_parser import load_issues
 from prompt_builder import build_prompt
 from deepseek_client import send_prompt
 from output_handler import save_results
 from utils import setup_logger
+
+SCRIPT_DIR = Path(__file__).parent.resolve()
+PROJECT_ROOT = SCRIPT_DIR.parent.parent
+DEFAULT_DATA_DIR = PROJECT_ROOT / "data" 
+DEFAULT_INPUT_FILE = DEFAULT_DATA_DIR / "input.json"
+DEFAULT_OUTPUT_FILE = DEFAULT_DATA_DIR / "output.json"
 
 logger = setup_logger(__name__)
 
@@ -14,13 +21,15 @@ def main() -> None:
     )
     parser.add_argument(
         "--input", "-i",
-        default="data/input.json",
-        help="Path to input JSON file (default: data/input.json)"
+        type=Path,
+        default=DEFAULT_INPUT_FILE,
+        help=f"Path to input JSON file (default: {DEFAULT_INPUT_FILE.relative_to(PROJECT_ROOT)})"
     )
     parser.add_argument(
         "--output", "-o",
-        default="data/output.json",
-        help="Path to output JSON file (default: data/output.json)"
+        type=Path,
+        default=DEFAULT_OUTPUT_FILE,
+        help=f"Path to output JSON file (default: {DEFAULT_OUTPUT_FILE.relative_to(PROJECT_ROOT)})"
     )
     args = parser.parse_args()
 
