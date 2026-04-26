@@ -19,18 +19,21 @@ def test_sample_exception():
     """Test that demonstrates checking for expected exceptions."""
     with pytest.raises(ValueError):
         int("not a number")
-    
+
     with pytest.raises(ZeroDivisionError):
         1 / 0
 
 
 # Parametrized test example
-@pytest.mark.parametrize("input_val, expected", [
-    (2, 4),
-    (3, 9),
-    (4, 16),
-    (5, 25),
-])
+@pytest.mark.parametrize(
+    "input_val, expected",
+    [
+        (2, 4),
+        (3, 9),
+        (4, 16),
+        (5, 25),
+    ],
+)
 def test_sample_parametrized(input_val, expected):
     """Parametrized test running the same test with different inputs."""
     result = input_val * input_val
@@ -41,11 +44,7 @@ def test_sample_parametrized(input_val, expected):
 @pytest.fixture
 def sample_data():
     """Fixture that provides test data."""
-    return {
-        "name": "Test Task",
-        "status": "In Progress",
-        "priority": "High"
-    }
+    return {"name": "Test Task", "status": "In Progress", "priority": "High"}
 
 
 def test_with_fixture(sample_data):
@@ -75,15 +74,15 @@ def test_file_operations(temp_file):
 # Test class example
 class TestSampleClass:
     """Example test class demonstrating grouped tests."""
-    
+
     def test_method_one(self):
         """First test method in the class."""
         assert True
-    
+
     def test_method_two(self):
         """Second test method in the class."""
         assert not False
-    
+
     @pytest.mark.skip(reason="Demonstrating a skipped test")
     def test_skipped(self):
         """This test will be skipped."""
@@ -109,7 +108,7 @@ def test_unit_example():
 def test_string_operations():
     """Test demonstrating string assertions."""
     text = "Jira Task Analysis"
-    
+
     assert text.startswith("Jira")
     assert text.endswith("Analysis")
     assert "Task" in text
@@ -120,7 +119,7 @@ def test_string_operations():
 def test_list_operations():
     """Test demonstrating list assertions."""
     items = ["item1", "item2", "item3"]
-    
+
     assert len(items) == 3
     assert "item2" in items
     assert items[0] == "item1"
