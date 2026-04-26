@@ -37,3 +37,6 @@ markers = [
     "unit: unit tests",
     "integration: integration tests",
 ]
+
+[tool.ruff.lint.flake8-tidy-imports]
+ban-relative-imports = "all"
