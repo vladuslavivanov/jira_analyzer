@@ -26,10 +26,10 @@ jobs:
         run: |
           uv sync --group check
 
-      - name: Run tests
-        run: |
-          uv run pytest
-
       - name: Run linting
         run: |
           uv run ruff check .
+
+      - name: Run tests
+        run: |
+          uv run pytest
