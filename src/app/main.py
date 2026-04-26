@@ -1,8 +1,8 @@
 import argparse
-import pathlib
-import importlib_resources
 import sys
 from pathlib import Path
+
+import importlib_resources
 
 import analyzer.core.llm.prompts as llm_prompts
 from analyzer.core.llm.deepseek_client import send_prompt
@@ -20,7 +20,7 @@ DEFAULT_OUTPUT_FILE = DEFAULT_DATA_DIR / "output.json"
 logger = setup_logger(__name__)
 
 
-def main() -> None:
+def setup_arg_parser():
     parser = argparse.ArgumentParser(
         description="Analyze Jira issues using DeepSeek API"
     )
@@ -38,25 +38,39 @@ def main() -> None:
         default=DEFAULT_OUTPUT_FILE,
         help=f"Path to output JSON file (default: {DEFAULT_OUTPUT_FILE.relative_to(PROJECT_ROOT)})",
     )
-    args = parser.parse_args()
+    return parser
 
+
+def parse_args(sys_argv):
+    """
+    NOTE: first argument is executing program name
+    """
+    parser = setup_arg_parser()
+    parser.parse_args(sys_argv[1:])
+
+
+def main(args) -> int:
     # Загрузка задач
     try:
         issues = load_issues(args.input)
     except Exception as e:
         logger.error(f"Exiting due to input error: {e}")
-        sys.exit(1)
+        return 1
 
     results = []
     for idx, issue in enumerate(issues, start=1):
         element_type = issue["element type"]
         description = issue["description"]
         logger.info(f"Processing issue {idx}/{len(issues)}: {element_type}")
-        
+
         # TODO: support dynamic change of prompt
-        with importlib_resources.files(llm_prompts).joinpath("system_prompt.template").open() as prompt_file:
+        with (
+            importlib_resources.files(llm_prompts)
+            .joinpath("system_prompt.template")
+            .open() as prompt_file
+        ):
             prompt = build_prompt(element_type, description, prompt_file)
-            
+
         try:
             analysis = send_prompt(prompt)
             # Добавляем исходные данные для прозрачности
@@ -79,10 +93,12 @@ def main() -> None:
         save_results(results, args.output)
     except Exception as e:
         logger.error(f"Exiting due to output error: {e}")
-        sys.exit(1)
+        return 1
 
     logger.info("Processing completed successfully")
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    args = parse_args(sys.argv)
+    sys.exit(main(args))
