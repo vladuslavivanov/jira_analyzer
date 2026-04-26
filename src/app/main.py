@@ -53,6 +53,7 @@ def main() -> None:
         description = issue["description"]
         logger.info(f"Processing issue {idx}/{len(issues)}: {element_type}")
         
+        # TODO: support dynamic change of prompt
         with importlib_resources.files(llm_prompts).joinpath("system_prompt.template").open() as prompt_file:
             prompt = build_prompt(element_type, description, prompt_file)
             
