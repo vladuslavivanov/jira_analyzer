@@ -1,35 +1,40 @@
 import argparse
-from pathlib import Path
+import pathlib
 import sys
-from jira_parser import load_issues
-from prompt_builder import build_prompt
-from deepseek_client import send_prompt
-from output_handler import save_results
-from utils import setup_logger
+from pathlib import Path
+
+from analyzer.core.llm.deepseek_client import send_prompt
+from analyzer.core.llm.prompt_builder import build_prompt
+from app.output_handler import save_results
+from tasktracker.jira.jira_parser import load_issues
+from util.logger import setup_logger
 
 SCRIPT_DIR = Path(__file__).parent.resolve()
 PROJECT_ROOT = SCRIPT_DIR.parent.parent
-DEFAULT_DATA_DIR = PROJECT_ROOT / "data" 
+DEFAULT_DATA_DIR = PROJECT_ROOT / "data"
 DEFAULT_INPUT_FILE = DEFAULT_DATA_DIR / "input.json"
 DEFAULT_OUTPUT_FILE = DEFAULT_DATA_DIR / "output.json"
 
 logger = setup_logger(__name__)
+
 
 def main() -> None:
     parser = argparse.ArgumentParser(
         description="Analyze Jira issues using DeepSeek API"
     )
     parser.add_argument(
-        "--input", "-i",
+        "--input",
+        "-i",
         type=Path,
         default=DEFAULT_INPUT_FILE,
-        help=f"Path to input JSON file (default: {DEFAULT_INPUT_FILE.relative_to(PROJECT_ROOT)})"
+        help=f"Path to input JSON file (default: {DEFAULT_INPUT_FILE.relative_to(PROJECT_ROOT)})",
     )
     parser.add_argument(
-        "--output", "-o",
+        "--output",
+        "-o",
         type=Path,
         default=DEFAULT_OUTPUT_FILE,
-        help=f"Path to output JSON file (default: {DEFAULT_OUTPUT_FILE.relative_to(PROJECT_ROOT)})"
+        help=f"Path to output JSON file (default: {DEFAULT_OUTPUT_FILE.relative_to(PROJECT_ROOT)})",
     )
     args = parser.parse_args()
 
@@ -46,7 +51,7 @@ def main() -> None:
         description = issue["description"]
         logger.info(f"Processing issue {idx}/{len(issues)}: {element_type}")
 
-        prompt = build_prompt(element_type, description)
+        prompt = build_prompt(element_type, description, pathlib.Path("resources/prompts/system_prompt.template"))
         try:
             analysis = send_prompt(prompt)
             # Добавляем исходные данные для прозрачности
@@ -56,11 +61,13 @@ def main() -> None:
         except Exception as e:
             logger.error(f"Failed to process issue {idx}: {e}")
             # Заглушка с ошибкой
-            results.append({
-                "error": str(e),
-                "input_element_type": element_type,
-                "input_description": description
-            })
+            results.append(
+                {
+                    "error": str(e),
+                    "input_element_type": element_type,
+                    "input_description": description,
+                }
+            )
 
     # Сохранение результатов
     try:
@@ -70,6 +77,7 @@ def main() -> None:
         sys.exit(1)
 
     logger.info("Processing completed successfully")
+
 
 if __name__ == "__main__":
     main()
