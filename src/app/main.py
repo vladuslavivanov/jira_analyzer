@@ -1,8 +1,10 @@
 import argparse
 import pathlib
+import importlib_resources
 import sys
 from pathlib import Path
 
+import analyzer.core.llm.prompts as llm_prompts
 from analyzer.core.llm.deepseek_client import send_prompt
 from analyzer.core.llm.prompt_builder import build_prompt
 from app.output_handler import save_results
@@ -50,8 +52,10 @@ def main() -> None:
         element_type = issue["element type"]
         description = issue["description"]
         logger.info(f"Processing issue {idx}/{len(issues)}: {element_type}")
-
-        prompt = build_prompt(element_type, description, pathlib.Path("resources/prompts/system_prompt.template"))
+        
+        with importlib_resources.files(llm_prompts).joinpath("system_prompt.template").open() as prompt_file:
+            prompt = build_prompt(element_type, description, prompt_file)
+            
         try:
             analysis = send_prompt(prompt)
             # Добавляем исходные данные для прозрачности
