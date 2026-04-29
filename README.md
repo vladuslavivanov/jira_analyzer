@@ -1,12 +1,43 @@
-# Jira Analyzer with DeepSeek
+# Jira AI Analyzer
 
-Анализирует описания задач из Jira с помощью DeepSeek API и сохраняет структурированный JSON-отчёт.
+Tool for automatic data collection and analysis of Jira task tracker with AI-driven quality estimation.
 
-## Установка
+## Installation
 
-1. Клонируйте репозиторий.
-2. Создайте виртуальное окружение:
+1. Clone the repository.
+2. Install dependencies using [uv](https://github.com/astral-sh/uv):
    ```bash
-   python -m venv venv
-   source venv/bin/activate  # Linux/Mac
-   venv\Scripts\activate     # Windows
+   uv sync
+   ```
+3. Create a `.env` file in the `jira_analyzer` directory and add your DeepSeek API key:
+   ```env
+   DEEPSEEK_API_KEY=your_api_key_here
+   ```
+
+## Usage
+
+The project uses a unified entry point via `python -m jira_analyzer`.
+
+### Command Line Interface (CLI)
+Run the analysis on a JSON file and save the results:
+```bash
+export PYTHONPATH=src
+python -m jira_analyzer --input data/input.json --output data/output.json
+```
+
+### Web User Interface (Streamlit)
+Launch the interactive browser-based UI:
+```bash
+export PYTHONPATH=src
+python -m jira_analyzer --streamlit
+```
+
+## Project Structure
+
+- `src/jira_analyzer/`: Core package logic.
+  - `analyzer/`: AI analysis engine and prompt templates.
+  - `tasktracker/`: Jira data parsing and extraction.
+  - `ui.py`: Streamlit web application.
+  - `cli.py`: Command-line interface logic.
+- `data/`: Sample input and output JSON files.
+- `tests/`: Quality assurance suite.
