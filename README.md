@@ -21,15 +21,13 @@ The project uses a unified entry point via `python -m jira_analyzer`.
 ### Command Line Interface (CLI)
 Run the analysis on a JSON file and save the results:
 ```bash
-export PYTHONPATH=src
-python -m jira_analyzer --input data/input.json --output data/output.json
+uv run python src/jira_analyzer --input data/input.json --output data/output.json
 ```
 
 ### Web User Interface (Streamlit)
 Launch the interactive browser-based UI:
 ```bash
-export PYTHONPATH=src
-python -m jira_analyzer --streamlit
+uv run python src/jira_analyzer --streamlit
 ```
 
 ## Project Structure
