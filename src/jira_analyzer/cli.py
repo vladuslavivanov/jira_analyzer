@@ -29,14 +29,14 @@ def setup_arg_parser() -> argparse.ArgumentParser:
         "-i",
         type=Path,
         default=DEFAULT_INPUT_FILE,
-        help=f"Path to input JSON file (default: data/input.json)",
+        help="Path to input JSON file (default: data/input.json)",
     )
     parser.add_argument(
         "--output",
         "-o",
         type=Path,
         default=DEFAULT_OUTPUT_FILE,
-        help=f"Path to output JSON file (default: data/output.json)",
+        help="Path to output JSON file (default: data/output.json)",
     )
     return parser
 

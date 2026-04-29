@@ -2,7 +2,6 @@ import streamlit as st
 import json
 import pandas as pd
 from pathlib import Path
-from typing import List, Dict, Any
 
 from jira_analyzer.analyzer.engine import run_analysis
 from jira_analyzer.tasktracker.jira.jira_parser import load_issues
