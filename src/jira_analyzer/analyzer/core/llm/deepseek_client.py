@@ -2,8 +2,8 @@ import json
 
 from openai import OpenAI
 
-from util.config import DEEPSEEK_API_KEY, DEEPSEEK_BASE_URL, DEEPSEEK_MODEL
-from util.logger import setup_logger
+from jira_analyzer.utils.config import DEEPSEEK_API_KEY, DEEPSEEK_BASE_URL, DEEPSEEK_MODEL
+from jira_analyzer.utils.logger import setup_logger
 
 logger = setup_logger(__name__)
 

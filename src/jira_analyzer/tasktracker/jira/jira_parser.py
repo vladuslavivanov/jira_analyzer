@@ -1,7 +1,7 @@
 import json
 from typing import Any, Dict, List
 
-from util.logger import setup_logger
+from jira_analyzer.utils.logger import setup_logger
 
 logger = setup_logger(__name__)
 
