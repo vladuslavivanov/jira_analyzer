@@ -359,7 +359,7 @@ requires-dist = [
     { name = "openai", specifier = ">=2.31.0" },
     { name = "pandas", specifier = ">=2.2.0" },
     { name = "python-dotenv", specifier = ">=1.2.2" },
-    { name = "streamlit", specifier = ">=1.30.0" },
+    { name = "streamlit", specifier = ">=1.57.0" },
 ]
 
 [package.metadata.requires-dev]
