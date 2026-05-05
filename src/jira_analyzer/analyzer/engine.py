@@ -1,8 +1,7 @@
-import importlib_resources
-from typing import List, Dict, Any
+from importlib import resources as importlib_resources
+from typing import Any, Dict, List
 
 import jira_analyzer.analyzer.core.llm.prompts as llm_prompts
-from jira_analyzer.analyzer.core.llm.deepseek_client import send_prompt
 from jira_analyzer.analyzer.core.llm.prompt_builder import build_prompt
 from jira_analyzer.utils.logger import setup_logger
 
@@ -32,7 +31,7 @@ def run_analysis(issues: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
             with (
                 importlib_resources.files(llm_prompts)
                 .joinpath("system_prompt.template")
-                .open() as prompt_file
+                .open(encoding="utf-8") as prompt_file
             ):
                 prompt = build_prompt(element_type, description, prompt_file)
         except Exception as e:
@@ -45,6 +44,8 @@ def run_analysis(issues: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
             continue
 
         try:
+            from jira_analyzer.analyzer.core.llm.deepseek_client import send_prompt
+
             analysis = send_prompt(prompt)
             # Add metadata for context
             analysis["input_element_type"] = element_type

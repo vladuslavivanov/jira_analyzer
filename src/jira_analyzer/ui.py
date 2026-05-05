@@ -4,6 +4,8 @@ import pandas as pd
 from pathlib import Path
 
 from jira_analyzer.analyzer.engine import run_analysis
+from jira_analyzer.tasktracker.jira import JiraConnectionConfig, fetch_issue
+from jira_analyzer.tasktracker.jira import jira_issue_to_analysis_input
 from jira_analyzer.tasktracker.jira.jira_parser import load_issues
 from jira_analyzer.utils.logger import setup_logger
 
@@ -18,23 +20,57 @@ def main():
 
     st.title("🤖 Jira AI Task Linter")
     st.markdown("""
-    Upload your Jira issues export (JSON) to analyze the quality of descriptions and requirements using AI.
+    Upload your Jira issues export (JSON) or fetch a Jira issue by key to analyze
+    the quality of descriptions and requirements using AI.
     """)
 
     # Sidebar for configuration
     st.sidebar.header("Settings")
-    
-    # File uploader
-    uploaded_file = st.sidebar.file_uploader("Upload Jira JSON", type=["json"])
-    
-    # Option to use sample data if no file is uploaded
-    use_sample = st.sidebar.checkbox("Use sample data (data/input.json)", value=not uploaded_file)
+
+    source = st.sidebar.radio("Issue source", ["Jira", "JSON"], horizontal=True)
+    uploaded_file = None
+    use_sample = False
+    jira_server = ""
+    jira_issue = ""
+    jira_username = ""
+    jira_token = ""
+    jira_verify_ssl = True
+
+    if source == "Jira":
+        jira_server = st.sidebar.text_input(
+            "Jira server URL",
+            value="http://127.0.0.1:8081",
+        )
+        jira_issue = st.sidebar.text_input("Jira issue key", value="YA-1")
+        jira_username = st.sidebar.text_input("Jira username")
+        jira_token = st.sidebar.text_input("Jira API token/password", type="password")
+        jira_verify_ssl = st.sidebar.checkbox("Verify SSL", value=False)
+    else:
+        uploaded_file = st.sidebar.file_uploader("Upload Jira JSON", type=["json"])
+        use_sample = st.sidebar.checkbox(
+            "Use sample data (data/input.json)",
+            value=not uploaded_file,
+        )
 
     if st.button("🚀 Run Analysis"):
         issues = None
         
         try:
-            if uploaded_file is not None:
+            if source == "Jira":
+                if not jira_server or not jira_issue:
+                    st.error("Jira server URL and issue key are required.")
+                    return
+
+                config = JiraConnectionConfig(
+                    server=jira_server,
+                    username=jira_username or None,
+                    token=jira_token or None,
+                    verify_ssl=jira_verify_ssl,
+                )
+                with st.spinner(f"Fetching {jira_issue} from Jira..."):
+                    jira_issue_data = fetch_issue(jira_issue, config)
+                    issues = [jira_issue_to_analysis_input(jira_issue_data)]
+            elif uploaded_file is not None:
                 # Process uploaded file
                 data = json.load(uploaded_file)
                 if not isinstance(data, list):
@@ -62,10 +98,25 @@ def main():
                 
                 # Aligning with keys from system_prompt.template
                 # overall_score, verdict, diagnosis, recommendations
-                display_cols = ["input_element_type", "overall_score", "verdict", "diagnosis", "recommendations"]
+                display_cols = [
+                    "input_element_type",
+                    "overall_score",
+                    "verdict",
+                    "diagnosis",
+                    "recommendations",
+                ]
                 available_cols = [c for c in display_cols if c in df.columns]
                 
                 if not df.empty:
+                    st.subheader("JSON Result")
+                    st.json(results)
+                    st.download_button(
+                        "Download JSON",
+                        data=json.dumps(results, ensure_ascii=False, indent=2),
+                        file_name="analysis_result.json",
+                        mime="application/json",
+                    )
+
                     st.subheader("Summary Table")
                     # Using width='stretch' as per Streamlit deprecation warning
                     st.dataframe(df[available_cols] if available_cols else df, width="stretch")
@@ -107,7 +158,12 @@ def main():
                                 st.write(res.get("diagnosis", "No diagnosis available"))
                                 
                                 st.write("**Recommendations:**")
-                                st.markdown(res.get("recommendations", "No recommendations available"))
+                                st.markdown(
+                                    res.get(
+                                        "recommendations",
+                                        "No recommendations available",
+                                    )
+                                )
                         
                         st.divider()
                 else:

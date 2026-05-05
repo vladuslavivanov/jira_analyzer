@@ -1,10 +1,13 @@
 import argparse
+import os
 import sys
 from pathlib import Path
 from typing import List, Optional
 
 from jira_analyzer.analyzer.engine import run_analysis
 from jira_analyzer.app.output_handler import save_results
+from jira_analyzer.tasktracker.jira import JiraConnectionConfig, fetch_issue
+from jira_analyzer.tasktracker.jira import jira_issue_to_analysis_input
 from jira_analyzer.tasktracker.jira.jira_parser import load_issues
 from jira_analyzer.utils.logger import setup_logger
 
@@ -38,7 +41,53 @@ def setup_arg_parser() -> argparse.ArgumentParser:
         default=DEFAULT_OUTPUT_FILE,
         help="Path to output JSON file (default: data/output.json)",
     )
+    parser.add_argument(
+        "--jira-issue",
+        "-j",
+        help="Jira issue key to fetch and analyze, for example YA-1",
+    )
+    parser.add_argument(
+        "--jira-server",
+        help="Jira server URL. Can also be provided via JIRA_SERVER_URL.",
+    )
+    parser.add_argument(
+        "--jira-username",
+        help="Jira username. Can also be provided via JIRA_USERNAME.",
+    )
+    parser.add_argument(
+        "--jira-token",
+        help="Jira API token/password. Can also be provided via JIRA_API_TOKEN.",
+    )
+    parser.add_argument(
+        "--jira-no-verify",
+        action="store_true",
+        help="Disable SSL certificate verification for Jira requests.",
+    )
     return parser
+
+
+def load_issues_from_args(args: argparse.Namespace) -> list[dict]:
+    if not args.jira_issue:
+        return load_issues(str(args.input))
+
+    config = JiraConnectionConfig(
+        server=args.jira_server or os.getenv("JIRA_SERVER_URL", ""),
+        username=args.jira_username or os.getenv("JIRA_USERNAME") or None,
+        token=args.jira_token or os.getenv("JIRA_API_TOKEN") or None,
+        verify_ssl=(
+            False
+            if args.jira_no_verify
+            else os.getenv("JIRA_VERIFY_SSL", "true").lower()
+            not in {"0", "false", "no"}
+        ),
+    )
+    if not config.server:
+        raise ValueError(
+            "Jira server URL is required. Use --jira-server or JIRA_SERVER_URL."
+        )
+
+    jira_issue = fetch_issue(args.jira_issue, config)
+    return [jira_issue_to_analysis_input(jira_issue)]
 
 def main(argv: Optional[List[str]] = None) -> int:
     """
@@ -51,9 +100,9 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     # 1. Load Issues
     try:
-        issues = load_issues(str(args.input))
+        issues = load_issues_from_args(args)
     except Exception as e:
-        logger.error(f"Failed to load issues from {args.input}: {e}")
+        logger.error(f"Failed to load issues: {e}")
         return 1
 
     # 2. Run Analysis
