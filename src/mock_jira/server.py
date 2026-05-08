@@ -11,7 +11,7 @@ from urllib.parse import unquote, urlparse
 
 DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 8081
-DEFAULT_DATA_FILE = Path(__file__).resolve().parents[3] / "data" / "mock_jira_issues.json"
+DEFAULT_DATA_FILE = Path(__file__).resolve().parents[2] / "data" / "mock_jira_issues.json"
 
 
 def load_issues(path: Path = DEFAULT_DATA_FILE) -> dict[str, dict[str, Any]]:

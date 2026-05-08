@@ -1,3 +1,13 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
 [project]
 name = "jira-analyzer"
 version = "0.1.0"
@@ -15,7 +25,7 @@ dependencies = [
 
 [project.scripts]
 jira-analyzer = "jira_analyzer.cli:main"
-mock-jira = "jira_analyzer.mock_jira.server:main"
+mock-jira = "mock_jira.server:main"
 
 [dependency-groups]
 dev = [
