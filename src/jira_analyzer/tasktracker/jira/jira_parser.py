@@ -1,8 +1,10 @@
 import json
-from typing import List, Dict, Any
-from utils import setup_logger
+from typing import Any, Dict, List
+
+from jira_analyzer.utils.logger import setup_logger
 
 logger = setup_logger(__name__)
+
 
 def load_issues(file_path: str) -> List[Dict[str, Any]]:
     """
@@ -10,7 +12,7 @@ def load_issues(file_path: str) -> List[Dict[str, Any]]:
     Каждый объект должен содержать поля "element type" и "description".
     """
     try:
-        with open(file_path, 'r', encoding='utf-8') as f:
+        with open(file_path, "r", encoding="utf-8") as f:
             data = json.load(f)
         if not isinstance(data, list):
             raise ValueError("Input JSON must be an array of objects")
