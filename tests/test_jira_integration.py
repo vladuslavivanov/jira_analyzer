@@ -10,7 +10,7 @@ from urllib.request import urlopen
 
 import pytest
 
-from jira_analyzer.mock_jira.server import create_server
+from mock_jira.server import create_server
 from jira_analyzer.tasktracker.jira import JiraConnectionConfig, JiraTaskClient
 from jira_analyzer.tasktracker.jira import jira_issue_to_analysis_input
 

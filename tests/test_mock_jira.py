@@ -8,7 +8,7 @@ from urllib.request import urlopen
 
 import pytest
 
-from jira_analyzer.mock_jira.server import create_server, load_issues
+from mock_jira.server import create_server, load_issues
 
 
 @pytest.fixture
