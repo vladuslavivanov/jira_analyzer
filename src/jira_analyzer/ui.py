@@ -25,6 +25,15 @@ from jira_analyzer.utils.logger import setup_logger
 
 logger = setup_logger(__name__)
 
+SCORING_OPTIONS = {
+    "0/1": "binary",
+    "0-100%": "percent",
+    "0-5": "five",
+}
+SCORING_LABEL_BY_VALUE = {
+    value: label for label, value in SCORING_OPTIONS.items()
+}
+
 TRANSLATIONS = {
     "en": {
         "language": "Language",
@@ -47,8 +56,9 @@ TRANSLATIONS = {
         "upload_jira_json": "Upload Jira JSON",
         "use_sample": "Use sample data (data/input.json)",
         "run_analysis": "Run Analysis",
+        "worker_count": "Analysis threads",
         "no_issues": "No issues were found.",
-        "analyzing": "Analyzing {count} issues via LLM...",
+        "analyzing": "Analyzing {count} issues via LLM with {workers} workers...",
         "analysis_complete": "Analysis complete.",
         "analysis_error": "An error occurred during analysis: {error}",
         "analysis_prompt": "Analysis prompt",
@@ -61,12 +71,21 @@ TRANSLATIONS = {
         "include_overall": "Include overall issue conclusion",
         "criteria": "Criteria",
         "criterion": "Criterion {number}",
+        "move_up": "Up",
+        "move_down": "Down",
         "remove": "Remove",
         "criterion_name": "Criterion name",
         "criterion_description": "Criterion description",
         "scoring_system": "Scoring system",
+        "default_scoring_system": "Scoring system for all criteria",
         "include_criterion_review": "Include criterion review",
         "add_criterion": "Add criterion",
+        "prompt_config_io": "Prompt config import/export",
+        "export_prompt_config": "Export prompt config",
+        "import_prompt_config": "Import prompt config",
+        "prompt_config_file": "Prompt config JSON",
+        "prompt_config_imported": "Prompt config imported.",
+        "invalid_prompt_config": "Invalid prompt config: {error}",
         "legacy_raw_prompt": "Legacy raw prompt",
         "default_legacy_prompt": "Default legacy prompt",
         "jira_server_required": "Jira server URL is required.",
@@ -116,8 +135,9 @@ TRANSLATIONS = {
         "upload_jira_json": "Загрузить Jira JSON",
         "use_sample": "Использовать пример (data/input.json)",
         "run_analysis": "Запустить анализ",
+        "worker_count": "Количество потоков анализа",
         "no_issues": "Задачи не найдены.",
-        "analyzing": "Анализируем задач через LLM: {count}...",
+        "analyzing": "Анализируем задач через LLM: {count}, потоков: {workers}...",
         "analysis_complete": "Анализ завершён.",
         "analysis_error": "Во время анализа произошла ошибка: {error}",
         "analysis_prompt": "Промпт анализа",
@@ -130,12 +150,21 @@ TRANSLATIONS = {
         "include_overall": "Добавлять общий вывод по задаче",
         "criteria": "Критерии",
         "criterion": "Критерий {number}",
+        "move_up": "Выше",
+        "move_down": "Ниже",
         "remove": "Удалить",
         "criterion_name": "Название критерия",
         "criterion_description": "Описание критерия",
         "scoring_system": "Система оценивания",
+        "default_scoring_system": "Система оценивания для всех критериев",
         "include_criterion_review": "Добавлять рецензию по критерию",
         "add_criterion": "Добавить критерий",
+        "prompt_config_io": "Импорт/экспорт конфига промпта",
+        "export_prompt_config": "Экспортировать конфиг промпта",
+        "import_prompt_config": "Импортировать конфиг промпта",
+        "prompt_config_file": "JSON конфига промпта",
+        "prompt_config_imported": "Конфиг промпта импортирован.",
+        "invalid_prompt_config": "Некорректный конфиг промпта: {error}",
         "legacy_raw_prompt": "Старый сырой промпт",
         "default_legacy_prompt": "Старый промпт по умолчанию",
         "jira_server_required": "URL сервера Jira обязателен.",
@@ -188,6 +217,129 @@ def _select_language():
     return translate
 
 
+def _apply_default_scoring_system_to_criteria() -> None:
+    selected_label = st.session_state.analysis_default_scoring_label
+    selected_scoring = SCORING_OPTIONS[selected_label]
+    st.session_state.analysis_default_scoring_system = selected_scoring
+    _set_all_criteria_scoring(
+        st.session_state.analysis_criteria,
+        selected_scoring,
+    )
+    for index in range(len(st.session_state.analysis_criteria)):
+        st.session_state[f"criterion_scoring_{index}"] = selected_label
+
+
+def _set_all_criteria_scoring(criteria: list[dict], scoring_system: str) -> None:
+    for criterion in criteria:
+        criterion["scoring_system"] = scoring_system
+
+
+def _clear_criterion_widget_state() -> None:
+    prefixes = (
+        "criterion_title_",
+        "criterion_description_",
+        "criterion_scoring_",
+        "criterion_review_",
+    )
+    for key in list(st.session_state.keys()):
+        if key.startswith(prefixes):
+            del st.session_state[key]
+
+
+def _move_criterion(index: int, direction: int) -> None:
+    criteria = st.session_state.analysis_criteria
+    target_index = index + direction
+    if target_index < 0 or target_index >= len(criteria):
+        return
+
+    criteria[index], criteria[target_index] = criteria[target_index], criteria[index]
+    _clear_criterion_widget_state()
+
+
+def _build_prompt_config_export() -> dict:
+    return {
+        "version": 1,
+        "system_prompt": st.session_state.analysis_system_prompt,
+        "general_prompt": st.session_state.analysis_general_prompt,
+        "include_overall_conclusion": (
+            st.session_state.analysis_include_overall_conclusion
+        ),
+        "default_scoring_system": st.session_state.analysis_default_scoring_system,
+        "criteria": [
+            {
+                "title": str(criterion.get("title", "")),
+                "description": str(criterion.get("description", "")),
+                "scoring_system": _normalize_scoring_system(
+                    criterion.get("scoring_system", "percent")
+                ),
+                "include_review": bool(criterion.get("include_review", False)),
+            }
+            for criterion in st.session_state.analysis_criteria
+        ],
+    }
+
+
+def _normalize_prompt_config(config: dict) -> dict:
+    if not isinstance(config, dict):
+        raise ValueError("Root value must be a JSON object.")
+
+    criteria = config.get("criteria")
+    if not isinstance(criteria, list):
+        raise ValueError("Field 'criteria' must be a list.")
+
+    imported_criteria = []
+    for index, criterion in enumerate(criteria, start=1):
+        if not isinstance(criterion, dict):
+            raise ValueError(f"Criterion {index} must be an object.")
+        imported_criteria.append(
+            {
+                "title": str(criterion.get("title", "")),
+                "description": str(criterion.get("description", "")),
+                "scoring_system": _normalize_scoring_system(
+                    criterion.get("scoring_system", "percent")
+                ),
+                "include_review": bool(criterion.get("include_review", False)),
+            }
+        )
+
+    default_scoring_system = _normalize_scoring_system(
+        config.get("default_scoring_system", "percent")
+    )
+    return {
+        "system_prompt": str(config.get("system_prompt", "")),
+        "general_prompt": str(config.get("general_prompt", "")),
+        "include_overall_conclusion": bool(
+            config.get("include_overall_conclusion", True)
+        ),
+        "default_scoring_system": default_scoring_system,
+        "criteria": imported_criteria,
+    }
+
+
+def _apply_prompt_config_to_state(config: dict) -> None:
+    st.session_state.analysis_system_prompt = config["system_prompt"]
+    st.session_state.analysis_general_prompt = config["general_prompt"]
+    st.session_state.analysis_include_overall_conclusion = config[
+        "include_overall_conclusion"
+    ]
+    st.session_state.analysis_default_scoring_system = config[
+        "default_scoring_system"
+    ]
+    st.session_state.analysis_default_scoring_label = SCORING_LABEL_BY_VALUE[
+        config["default_scoring_system"]
+    ]
+    st.session_state.analysis_criteria = config["criteria"]
+    _clear_criterion_widget_state()
+
+
+def _normalize_scoring_system(value) -> str:
+    if value in SCORING_LABEL_BY_VALUE:
+        return value
+    if value in SCORING_OPTIONS:
+        return SCORING_OPTIONS[value]
+    raise ValueError(f"Unsupported scoring system: {value}")
+
+
 def main() -> None:
     st.set_page_config(
         page_title="Jira AI Linter",
@@ -198,6 +350,12 @@ def main() -> None:
     st.title(t("title"))
     st.caption(t("caption"))
     source = st.sidebar.radio(t("issue_source"), ["Jira", "JSON"], horizontal=True)
+    worker_count = st.sidebar.number_input(
+        t("worker_count"),
+        min_value=1,
+        value=1,
+        step=1,
+    )
 
     prompt_config = _render_prompt_editor(t)
 
@@ -271,8 +429,14 @@ def main() -> None:
                 st.warning(t("no_issues"))
                 return
 
-            with st.spinner(t("analyzing", count=len(issues))):
-                results = run_analysis(issues, prompt_config=prompt_config)
+            with st.spinner(
+                t("analyzing", count=len(issues), workers=int(worker_count))
+            ):
+                results = run_analysis(
+                    issues,
+                    prompt_config=prompt_config,
+                    worker_count=int(worker_count),
+                )
 
             st.success(t("analysis_complete"))
             _render_results(results, t)
@@ -285,6 +449,8 @@ def _render_prompt_editor(t) -> AnalysisPromptConfig:
     _ensure_prompt_state()
 
     with st.expander(t("analysis_prompt"), expanded=True):
+        _render_prompt_config_io(t)
+
         st.caption(t("prompt_caption"))
         system_prompt = st.text_area(
             t("system_prompt"),
@@ -302,6 +468,13 @@ def _render_prompt_editor(t) -> AnalysisPromptConfig:
         )
 
         st.subheader(t("criteria"))
+        st.selectbox(
+            t("default_scoring_system"),
+            options=list(SCORING_OPTIONS.keys()),
+            key="analysis_default_scoring_label",
+            on_change=_apply_default_scoring_system_to_criteria,
+        )
+
         for index, criterion in enumerate(st.session_state.analysis_criteria):
             _render_criterion_editor(index, criterion, t)
 
@@ -310,7 +483,7 @@ def _render_prompt_editor(t) -> AnalysisPromptConfig:
                 {
                     "title": "",
                     "description": "",
-                    "scoring_system": "percent",
+                    "scoring_system": st.session_state.analysis_default_scoring_system,
                     "include_review": False,
                 }
             )
@@ -342,34 +515,92 @@ def _render_prompt_editor(t) -> AnalysisPromptConfig:
 
 
 def _ensure_prompt_state() -> None:
-    if "analysis_criteria" in st.session_state:
-        return
-
     defaults = get_default_analysis_prompt_config()
-    st.session_state.analysis_system_prompt = defaults.system_prompt
-    st.session_state.analysis_general_prompt = defaults.general_prompt
-    st.session_state.analysis_include_overall_conclusion = (
-        defaults.include_overall_conclusion
-    )
-    st.session_state.analysis_criteria = [
-        {
-            "title": criterion.title,
-            "description": criterion.description,
-            "scoring_system": criterion.scoring_system,
-            "include_review": criterion.include_review,
-        }
-        for criterion in defaults.criteria
-    ]
+    if "analysis_system_prompt" not in st.session_state:
+        st.session_state.analysis_system_prompt = defaults.system_prompt
+    if "analysis_general_prompt" not in st.session_state:
+        st.session_state.analysis_general_prompt = defaults.general_prompt
+    if "analysis_include_overall_conclusion" not in st.session_state:
+        st.session_state.analysis_include_overall_conclusion = (
+            defaults.include_overall_conclusion
+        )
+    if "analysis_default_scoring_system" not in st.session_state:
+        st.session_state.analysis_default_scoring_system = "percent"
+    if "analysis_default_scoring_label" not in st.session_state:
+        st.session_state.analysis_default_scoring_label = SCORING_LABEL_BY_VALUE[
+            st.session_state.analysis_default_scoring_system
+        ]
+    if "analysis_criteria" not in st.session_state:
+        st.session_state.analysis_criteria = [
+            {
+                "title": criterion.title,
+                "description": criterion.description,
+                "scoring_system": criterion.scoring_system,
+                "include_review": criterion.include_review,
+            }
+            for criterion in defaults.criteria
+        ]
+    if "pending_analysis_prompt_config" in st.session_state:
+        _apply_prompt_config_to_state(st.session_state.pending_analysis_prompt_config)
+        del st.session_state.pending_analysis_prompt_config
+
+
+def _render_prompt_config_io(t) -> None:
+    with st.expander(t("prompt_config_io"), expanded=False):
+        config_json = json.dumps(
+            _build_prompt_config_export(),
+            ensure_ascii=False,
+            indent=2,
+        )
+        st.download_button(
+            t("export_prompt_config"),
+            data=config_json,
+            file_name="analysis_prompt_config.json",
+            mime="application/json",
+        )
+
+        uploaded_config = st.file_uploader(
+            t("prompt_config_file"),
+            type=["json"],
+            key="analysis_prompt_config_upload",
+        )
+        if st.button(t("import_prompt_config"), disabled=uploaded_config is None):
+            try:
+                if uploaded_config is None:
+                    return
+                st.session_state.pending_analysis_prompt_config = (
+                    _normalize_prompt_config(json.load(uploaded_config))
+                )
+                st.rerun()
+            except Exception as error:
+                st.error(t("invalid_prompt_config", error=error))
 
 
 def _render_criterion_editor(index: int, criterion: dict, t) -> None:
     with st.container(border=True):
-        header_cols = st.columns([5, 1])
+        header_cols = st.columns([5, 1, 1, 1])
         with header_cols[0]:
             st.markdown(t("criterion", number=index + 1))
         with header_cols[1]:
+            st.button(
+                t("move_up"),
+                key=f"move_criterion_up_{index}",
+                disabled=index == 0,
+                on_click=_move_criterion,
+                args=(index, -1),
+            )
+        with header_cols[2]:
+            st.button(
+                t("move_down"),
+                key=f"move_criterion_down_{index}",
+                disabled=index == len(st.session_state.analysis_criteria) - 1,
+                on_click=_move_criterion,
+                args=(index, 1),
+            )
+        with header_cols[3]:
             if st.button(t("remove"), key=f"remove_criterion_{index}"):
                 st.session_state.analysis_criteria.pop(index)
+                _clear_criterion_widget_state()
                 st.rerun()
 
         criterion["title"] = st.text_input(
@@ -385,19 +616,15 @@ def _render_criterion_editor(index: int, criterion: dict, t) -> None:
         )
         cols = st.columns([1, 1])
         with cols[0]:
-            scoring_options = {
-                "0/1": "binary",
-                "0-100%": "percent",
-            }
             current_scoring = criterion.get("scoring_system", "percent")
-            current_label = "0/1" if current_scoring == "binary" else "0-100%"
+            current_label = SCORING_LABEL_BY_VALUE.get(current_scoring, "0-100%")
             selected_label = st.selectbox(
                 t("scoring_system"),
-                options=list(scoring_options.keys()),
-                index=list(scoring_options.keys()).index(current_label),
+                options=list(SCORING_OPTIONS.keys()),
+                index=list(SCORING_OPTIONS.keys()).index(current_label),
                 key=f"criterion_scoring_{index}",
             )
-            criterion["scoring_system"] = scoring_options[selected_label]
+            criterion["scoring_system"] = SCORING_OPTIONS[selected_label]
         with cols[1]:
             criterion["include_review"] = st.checkbox(
                 t("include_criterion_review"),
