@@ -3,7 +3,7 @@ from dataclasses import dataclass, field
 from typing import Literal, TextIO
 
 
-ScoringSystem = Literal["binary", "percent"]
+ScoringSystem = Literal["binary", "percent", "five"]
 
 
 @dataclass
@@ -108,10 +108,16 @@ Criteria:
 
 Output requirements:
 - Return only valid JSON. Do not include markdown or explanatory text outside JSON.
+- Follow the JSON schema below exactly and keep the exact criterion ids.
 - Put every criterion result into the top-level "criteria" object.
+- Each criterion result must include title, description, scoring_system, and score.
+- Include a criterion review field only when that criterion explicitly asks for it.
 - Put a compact score map into "criteria_scores" for downstream parsing.
+- criteria_scores values must mirror the matching criteria.*.score values.
+- Do not add criteria that are not listed in the schema.
 - For binary criteria, score must be 0 or 1.
 - For percent criteria, score must be an integer from 0 to 100.
+- For five-point criteria, score must be an integer from 0 to 5.
 - {overall_instruction}
 
 JSON schema to follow:
@@ -147,11 +153,7 @@ def criterion_key(criterion: CriterionConfig) -> str:
 
 
 def _format_criterion(index: int, criterion: CriterionConfig) -> str:
-    scale = (
-        "0 or 1, where 0 means the criterion is not met and 1 means it is met"
-        if criterion.scoring_system == "binary"
-        else "0 to 100, where the value is the percent of criterion fulfillment"
-    )
+    scale = _scoring_instruction(criterion.scoring_system)
     review_instruction = (
         "Include a review field with a concise review from this criterion perspective."
         if criterion.include_review
@@ -177,15 +179,14 @@ def _build_json_schema_text(
         key = criterion_key(criterion)
         criterion_result = {
             "title": criterion.title,
+            "description": criterion.description,
             "scoring_system": criterion.scoring_system,
-            "score": 0 if criterion.scoring_system == "binary" else 0,
+            "score": 0,
         }
         if criterion.include_review:
             criterion_result["review"] = "Criterion-specific review."
         criteria_schema[key] = criterion_result
-        score_schema[key] = (
-            "0/1" if criterion.scoring_system == "binary" else "0-100"
-        )
+        score_schema[key] = _score_schema_label(criterion.scoring_system)
 
     schema = {
         "criteria": criteria_schema,
@@ -197,3 +198,19 @@ def _build_json_schema_text(
     import json
 
     return json.dumps(schema, ensure_ascii=False, indent=2)
+
+
+def _scoring_instruction(scoring_system: ScoringSystem) -> str:
+    if scoring_system == "binary":
+        return "0 or 1, where 0 means the criterion is not met and 1 means it is met"
+    if scoring_system == "five":
+        return "0 to 5, where 0 means not met and 5 means fully met"
+    return "0 to 100, where the value is the percent of criterion fulfillment"
+
+
+def _score_schema_label(scoring_system: ScoringSystem) -> str:
+    if scoring_system == "binary":
+        return "0/1"
+    if scoring_system == "five":
+        return "0-5"
+    return "0-100"
