@@ -10,7 +10,6 @@ from jira_analyzer.analyzer.core.llm.prompt_builder import (
 )
 from jira_analyzer.analyzer.engine import (
     get_default_analysis_prompt_config,
-    get_default_prompt_template,
     run_analysis,
 )
 from jira_analyzer.app.output_handler import build_markdown_report
@@ -89,8 +88,6 @@ TRANSLATIONS = {
         "prompt_config_file": "Prompt config JSON",
         "prompt_config_imported": "Prompt config imported.",
         "invalid_prompt_config": "Invalid prompt config: {error}",
-        "legacy_raw_prompt": "Legacy raw prompt",
-        "default_legacy_prompt": "Default legacy prompt",
         "jira_server_required": "Jira server URL is required.",
         "jql_required": "JQL query is required.",
         "fetching_jql": "Fetching issues from Jira by JQL...",
@@ -171,8 +168,6 @@ TRANSLATIONS = {
         "prompt_config_file": "JSON конфига промпта",
         "prompt_config_imported": "Конфиг промпта импортирован.",
         "invalid_prompt_config": "Некорректный конфиг промпта: {error}",
-        "legacy_raw_prompt": "Старый сырой промпт",
-        "default_legacy_prompt": "Старый промпт по умолчанию",
         "jira_server_required": "URL сервера Jira обязателен.",
         "jql_required": "JQL-запрос обязателен.",
         "fetching_jql": "Получаем задачи из Jira по JQL...",
@@ -253,6 +248,13 @@ def _clear_criterion_widget_state() -> None:
             del st.session_state[key]
 
 
+def _sync_criterion_selection_from_widgets(criteria: list[dict]) -> None:
+    for index, criterion in enumerate(criteria):
+        widget_key = f"criterion_selected_{index}"
+        if widget_key in st.session_state:
+            criterion["selected"] = bool(st.session_state[widget_key])
+
+
 def _delete_selected_criteria(criteria: list[dict]) -> int:
     before_count = len(criteria)
     criteria[:] = [
@@ -293,6 +295,10 @@ def _filter_criteria(criteria: list[dict], query: str) -> list[tuple[int, dict]]
         if normalized_query in haystack:
             filtered.append((index, criterion))
     return filtered
+
+
+def _sync_criteria_search() -> None:
+    st.session_state.criteria_search = st.session_state.criteria_search_input
 
 
 def _build_prompt_config_export() -> dict:
@@ -397,6 +403,8 @@ def main() -> None:
         step=1,
     )
 
+    _ensure_prompt_state()
+    _render_prompt_config_io(t)
     prompt_config = _render_prompt_editor(t)
 
     uploaded_file = None
@@ -486,11 +494,7 @@ def main() -> None:
 
 
 def _render_prompt_editor(t) -> AnalysisPromptConfig:
-    _ensure_prompt_state()
-
     with st.expander(t("analysis_prompt"), expanded=True):
-        _render_prompt_config_io(t)
-
         st.caption(t("prompt_caption"))
         system_prompt = st.text_area(
             t("system_prompt"),
@@ -516,9 +520,11 @@ def _render_prompt_editor(t) -> AnalysisPromptConfig:
         )
         criteria_search = st.text_input(
             t("criteria_search"),
-            key="criteria_search",
+            key="criteria_search_input",
+            on_change=_sync_criteria_search,
         )
 
+        _sync_criterion_selection_from_widgets(st.session_state.analysis_criteria)
         action_cols = st.columns([1, 1, 4])
         selected_count = sum(
             1
@@ -564,14 +570,6 @@ def _render_prompt_editor(t) -> AnalysisPromptConfig:
             )
             st.rerun()
 
-        with st.expander(t("legacy_raw_prompt"), expanded=False):
-            st.text_area(
-                t("default_legacy_prompt"),
-                value=get_default_prompt_template(),
-                height=240,
-                disabled=True,
-            )
-
     criteria = [
         CriterionConfig(
             title=str(criterion.get("title", "")),
@@ -605,6 +603,10 @@ def _ensure_prompt_state() -> None:
         st.session_state.analysis_default_scoring_label = SCORING_LABEL_BY_VALUE[
             st.session_state.analysis_default_scoring_system
         ]
+    if "criteria_search" not in st.session_state:
+        st.session_state.criteria_search = ""
+    if "criteria_search_input" not in st.session_state:
+        st.session_state.criteria_search_input = st.session_state.criteria_search
     if "analysis_criteria" not in st.session_state:
         st.session_state.analysis_criteria = [
             {
@@ -654,7 +656,11 @@ def _render_prompt_config_io(t) -> None:
 
 def _render_criterion_editor(index: int, criterion: dict, t) -> None:
     with st.container(border=True):
-        header_cols = st.columns([0.6, 5, 0.6])
+        header_cols = st.columns(
+            [0.24, 7.8, 0.55],
+            gap="small",
+            vertical_alignment="center",
+        )
         with header_cols[0]:
             criterion["selected"] = st.checkbox(
                 t("select_criterion"),
@@ -663,7 +669,7 @@ def _render_criterion_editor(index: int, criterion: dict, t) -> None:
                 label_visibility="collapsed",
             )
         with header_cols[1]:
-            st.markdown(t("criterion", number=index + 1))
+            st.write(t("criterion", number=index + 1))
         with header_cols[2]:
             if st.button("❌", key=f"remove_criterion_{index}", help=t("remove")):
                 if _remove_criterion(index):
@@ -680,7 +686,7 @@ def _render_criterion_editor(index: int, criterion: dict, t) -> None:
             height=100,
             key=f"criterion_description_{index}",
         )
-        cols = st.columns([1, 1])
+        cols = st.columns([1, 1], vertical_alignment="bottom")
         with cols[0]:
             current_scoring = criterion.get("scoring_system", "percent")
             current_label = SCORING_LABEL_BY_VALUE.get(current_scoring, "0-100%")
@@ -692,6 +698,7 @@ def _render_criterion_editor(index: int, criterion: dict, t) -> None:
             )
             criterion["scoring_system"] = SCORING_OPTIONS[selected_label]
         with cols[1]:
+            st.write("")
             criterion["include_review"] = st.checkbox(
                 t("include_criterion_review"),
                 value=bool(criterion.get("include_review", False)),

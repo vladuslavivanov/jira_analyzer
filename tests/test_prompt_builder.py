@@ -15,6 +15,7 @@ from jira_analyzer.ui import (
     _filter_criteria,
     _normalize_prompt_config,
     _set_all_criteria_scoring,
+    _sync_criterion_selection_from_widgets,
 )
 
 
@@ -67,6 +68,22 @@ def test_delete_selected_and_all_criteria():
 
     assert _delete_all_criteria(criteria) == 1
     assert criteria == []
+
+
+def test_sync_criterion_selection_from_widget_state(monkeypatch):
+    from jira_analyzer import ui
+
+    criteria = [
+        {"title": "First", "selected": False},
+        {"title": "Second", "selected": False},
+    ]
+
+    monkeypatch.setitem(ui.st.session_state, "criterion_selected_0", True)
+    monkeypatch.setitem(ui.st.session_state, "criterion_selected_1", False)
+
+    _sync_criterion_selection_from_widgets(criteria)
+
+    assert [criterion["selected"] for criterion in criteria] == [True, False]
 
 
 def test_structured_prompt_contains_parseable_schema_for_mixed_criteria():
