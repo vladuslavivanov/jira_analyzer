@@ -226,13 +226,36 @@ def _apply_default_scoring_system_to_criteria() -> None:
         st.session_state.analysis_criteria,
         selected_scoring,
     )
-    for index in range(len(st.session_state.analysis_criteria)):
-        st.session_state[f"criterion_scoring_{index}"] = selected_label
+    _ensure_criteria_ui_ids(st.session_state.analysis_criteria)
+    for criterion in st.session_state.analysis_criteria:
+        st.session_state[
+            _criterion_widget_key(criterion, "criterion_scoring")
+        ] = selected_label
 
 
 def _set_all_criteria_scoring(criteria: list[dict], scoring_system: str) -> None:
     for criterion in criteria:
         criterion["scoring_system"] = scoring_system
+
+
+def _new_criterion_ui_id() -> str:
+    next_id = int(st.session_state.get("next_criterion_ui_id", 1))
+    st.session_state.next_criterion_ui_id = next_id + 1
+    return f"criterion_{next_id}"
+
+
+def _ensure_criteria_ui_ids(criteria: list[dict]) -> None:
+    for criterion in criteria:
+        if not criterion.get("_ui_id"):
+            criterion["_ui_id"] = _new_criterion_ui_id()
+
+
+def _criterion_widget_key(criterion: dict, field: str) -> str:
+    ui_id = criterion.get("_ui_id")
+    if not ui_id:
+        ui_id = _new_criterion_ui_id()
+        criterion["_ui_id"] = ui_id
+    return f"{field}_{ui_id}"
 
 
 def _clear_criterion_widget_state() -> None:
@@ -249,8 +272,9 @@ def _clear_criterion_widget_state() -> None:
 
 
 def _sync_criterion_selection_from_widgets(criteria: list[dict]) -> None:
-    for index, criterion in enumerate(criteria):
-        widget_key = f"criterion_selected_{index}"
+    _ensure_criteria_ui_ids(criteria)
+    for criterion in criteria:
+        widget_key = _criterion_widget_key(criterion, "criterion_selected")
         if widget_key in st.session_state:
             criterion["selected"] = bool(st.session_state[widget_key])
 
@@ -345,6 +369,7 @@ def _normalize_prompt_config(config: dict) -> dict:
                 ),
                 "include_review": bool(criterion.get("include_review", False)),
                 "selected": False,
+                "_ui_id": _new_criterion_ui_id(),
             }
         )
 
@@ -375,6 +400,7 @@ def _apply_prompt_config_to_state(config: dict) -> None:
         config["default_scoring_system"]
     ]
     st.session_state.analysis_criteria = config["criteria"]
+    _ensure_criteria_ui_ids(st.session_state.analysis_criteria)
     _clear_criterion_widget_state()
 
 
@@ -458,6 +484,7 @@ def main() -> None:
         )
 
     if st.button(t("run_analysis"), type="primary"):
+        st.session_state.analysis_results = None
         try:
             issues = _load_issues(
                 t=t,
@@ -486,11 +513,14 @@ def main() -> None:
                     worker_count=int(worker_count),
                 )
 
+            st.session_state.analysis_results = results
             st.success(t("analysis_complete"))
-            _render_results(results, t)
         except Exception as error:
             st.error(t("analysis_error", error=error))
             logger.exception("UI analysis error")
+
+    if st.session_state.analysis_results:
+        _render_results(st.session_state.analysis_results, t)
 
 
 def _render_prompt_editor(t) -> AnalysisPromptConfig:
@@ -566,6 +596,7 @@ def _render_prompt_editor(t) -> AnalysisPromptConfig:
                     "scoring_system": st.session_state.analysis_default_scoring_system,
                     "include_review": False,
                     "selected": False,
+                    "_ui_id": _new_criterion_ui_id(),
                 }
             )
             st.rerun()
@@ -615,9 +646,14 @@ def _ensure_prompt_state() -> None:
                 "scoring_system": criterion.scoring_system,
                 "include_review": criterion.include_review,
                 "selected": False,
+                "_ui_id": _new_criterion_ui_id(),
             }
             for criterion in defaults.criteria
         ]
+    else:
+        _ensure_criteria_ui_ids(st.session_state.analysis_criteria)
+    if "analysis_results" not in st.session_state:
+        st.session_state.analysis_results = None
     if "pending_analysis_prompt_config" in st.session_state:
         _apply_prompt_config_to_state(st.session_state.pending_analysis_prompt_config)
         del st.session_state.pending_analysis_prompt_config
@@ -665,26 +701,30 @@ def _render_criterion_editor(index: int, criterion: dict, t) -> None:
             criterion["selected"] = st.checkbox(
                 t("select_criterion"),
                 value=bool(criterion.get("selected", False)),
-                key=f"criterion_selected_{index}",
+                key=_criterion_widget_key(criterion, "criterion_selected"),
                 label_visibility="collapsed",
             )
         with header_cols[1]:
             st.write(t("criterion", number=index + 1))
         with header_cols[2]:
-            if st.button("❌", key=f"remove_criterion_{index}", help=t("remove")):
+            if st.button(
+                "❌",
+                key=_criterion_widget_key(criterion, "remove_criterion"),
+                help=t("remove"),
+            ):
                 if _remove_criterion(index):
                     st.rerun()
 
         criterion["title"] = st.text_input(
             t("criterion_name"),
             value=criterion.get("title", ""),
-            key=f"criterion_title_{index}",
+            key=_criterion_widget_key(criterion, "criterion_title"),
         )
         criterion["description"] = st.text_area(
             t("criterion_description"),
             value=criterion.get("description", ""),
             height=100,
-            key=f"criterion_description_{index}",
+            key=_criterion_widget_key(criterion, "criterion_description"),
         )
         cols = st.columns([1, 1], vertical_alignment="bottom")
         with cols[0]:
@@ -694,7 +734,7 @@ def _render_criterion_editor(index: int, criterion: dict, t) -> None:
                 t("scoring_system"),
                 options=list(SCORING_OPTIONS.keys()),
                 index=list(SCORING_OPTIONS.keys()).index(current_label),
-                key=f"criterion_scoring_{index}",
+                key=_criterion_widget_key(criterion, "criterion_scoring"),
             )
             criterion["scoring_system"] = SCORING_OPTIONS[selected_label]
         with cols[1]:
@@ -702,7 +742,7 @@ def _render_criterion_editor(index: int, criterion: dict, t) -> None:
             criterion["include_review"] = st.checkbox(
                 t("include_criterion_review"),
                 value=bool(criterion.get("include_review", False)),
-                key=f"criterion_review_{index}",
+                key=_criterion_widget_key(criterion, "criterion_review"),
             )
 
 
@@ -770,8 +810,48 @@ def _load_json_issues(uploaded_file, use_sample: bool, t) -> list[dict]:
     return []
 
 
+def _extract_criterion_scores(result: dict) -> list:
+    criteria = result.get("criteria")
+    if isinstance(criteria, dict) and criteria:
+        scores = []
+        for criterion_result in criteria.values():
+            if isinstance(criterion_result, dict) and "score" in criterion_result:
+                scores.append(criterion_result["score"])
+        if scores:
+            return scores
+
+    scores = result.get("criteria_scores")
+    if isinstance(scores, dict) and scores:
+        return list(scores.values())
+
+    return []
+
+
+def _build_results_table(results: list[dict]) -> pd.DataFrame:
+    rows = []
+    for index, result in enumerate(results, start=1):
+        row = {
+            "jira_key": result.get("jira_key") or result.get("key") or f"Issue {index}",
+            "input_element_type": result.get("input_element_type", "N/A"),
+        }
+        if "overall_score" in result:
+            row["overall_score"] = result["overall_score"]
+        if "verdict" in result:
+            row["verdict"] = result["verdict"]
+        if "overall_conclusion" in result:
+            row["overall_conclusion"] = result["overall_conclusion"]
+
+        for score_index, score in enumerate(_extract_criterion_scores(result), start=1):
+            row[f"К{score_index}"] = score
+
+        rows.append(row)
+
+    return pd.DataFrame(rows)
+
+
 def _render_results(results: list[dict], t) -> None:
     df = pd.DataFrame(results)
+    table_df = _build_results_table(results)
     markdown_report = build_markdown_report(results)
 
     json_tab, report_tab, table_tab, details_tab = st.tabs(
@@ -797,16 +877,7 @@ def _render_results(results: list[dict], t) -> None:
         )
 
     with table_tab:
-        display_cols = [
-            "jira_key",
-            "input_element_type",
-            "overall_score",
-            "verdict",
-            "diagnosis",
-            "recommendations",
-        ]
-        available_cols = [column for column in display_cols if column in df.columns]
-        st.dataframe(df[available_cols] if available_cols else df, width="stretch")
+        st.dataframe(table_df if not table_df.empty else df, width="stretch")
 
     with details_tab:
         for index, result in enumerate(results, start=1):
@@ -827,14 +898,16 @@ def _render_results(results: list[dict], t) -> None:
 
             col1, col2 = st.columns([1, 3])
             with col1:
-                st.metric(t("overall_score"), result.get("overall_score", "N/A"))
-                st.write(f"{t('verdict')}: {result.get('verdict', 'N/A')}")
+                if "overall_score" in result:
+                    st.metric(t("overall_score"), result["overall_score"])
+                if "verdict" in result:
+                    st.write(f"{t('verdict')}: {result['verdict']}")
 
-                scores = result.get("criteria_scores", {})
-                if isinstance(scores, dict) and scores:
+                scores = _extract_criterion_scores(result)
+                if scores:
                     st.write(t("criteria_breakdown"))
-                    for key, value in scores.items():
-                        st.write(f"- {key.replace('_', ' ').title()}: {value}")
+                    for score_index, value in enumerate(scores, start=1):
+                        st.write(f"- К{score_index}: {value}")
 
             with col2:
                 st.write(t("original_description"))

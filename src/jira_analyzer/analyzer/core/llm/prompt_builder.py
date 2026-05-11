@@ -83,11 +83,16 @@ def build_structured_prompt(
         for criterion in config.criteria
         if criterion.title.strip() and criterion.description.strip()
     ]
+    criterion_keys = _criterion_key_map(criteria)
     criteria_block = "\n".join(
-        _format_criterion(index, criterion)
+        _format_criterion(index, criterion, criterion_keys[index - 1])
         for index, criterion in enumerate(criteria, start=1)
     )
-    schema = _build_json_schema_text(criteria, config.include_overall_conclusion)
+    schema = _build_json_schema_text(
+        criteria,
+        config.include_overall_conclusion,
+        criterion_keys,
+    )
     overall_instruction = (
         "Also include the overall_conclusion field."
         if config.include_overall_conclusion
@@ -152,7 +157,27 @@ def criterion_key(criterion: CriterionConfig) -> str:
     return key or "criterion"
 
 
-def _format_criterion(index: int, criterion: CriterionConfig) -> str:
+def _criterion_key_map(criteria: list[CriterionConfig]) -> list[str]:
+    keys: list[str] = []
+    used: set[str] = set()
+    for index, criterion in enumerate(criteria, start=1):
+        base_key = criterion_key(criterion)
+        if base_key == "criterion":
+            base_key = f"criterion_{index}"
+
+        key = base_key
+        suffix = 2
+        while key in used:
+            key = f"{base_key}_{suffix}"
+            suffix += 1
+
+        used.add(key)
+        keys.append(key)
+
+    return keys
+
+
+def _format_criterion(index: int, criterion: CriterionConfig, key: str) -> str:
     scale = _scoring_instruction(criterion.scoring_system)
     review_instruction = (
         "Include a review field with a concise review from this criterion perspective."
@@ -160,7 +185,7 @@ def _format_criterion(index: int, criterion: CriterionConfig) -> str:
         else "Do not include a review field for this criterion."
     )
     return (
-        f"{index}. id: {criterion_key(criterion)}\n"
+        f"{index}. id: {key}\n"
         f"   title: {criterion.title}\n"
         f"   description: {criterion.description}\n"
         f"   scoring_system: {criterion.scoring_system}\n"
@@ -172,11 +197,13 @@ def _format_criterion(index: int, criterion: CriterionConfig) -> str:
 def _build_json_schema_text(
     criteria: list[CriterionConfig],
     include_overall_conclusion: bool,
+    criterion_keys: list[str] | None = None,
 ) -> str:
     criteria_schema = {}
     score_schema = {}
-    for criterion in criteria:
-        key = criterion_key(criterion)
+    if criterion_keys is None:
+        criterion_keys = _criterion_key_map(criteria)
+    for criterion, key in zip(criteria, criterion_keys, strict=True):
         criterion_result = {
             "title": criterion.title,
             "description": criterion.description,

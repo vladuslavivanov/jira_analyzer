@@ -18,6 +18,17 @@ def save_results(results: List[Dict[str, Any]], output_path: str) -> None:
 
 
 def build_markdown_report(results: List[Dict[str, Any]]) -> str:
+    max_criteria_count = max(
+        (len(_extract_criterion_scores(result)) for result in results),
+        default=0,
+    )
+    summary_headers = ["#", "Issue", "Type"]
+    summary_headers.extend(f"К{index}" for index in range(1, max_criteria_count + 1))
+    if any("overall_score" in result for result in results):
+        summary_headers.append("Score")
+    if any("verdict" in result for result in results):
+        summary_headers.append("Verdict")
+
     lines = [
         "# Jira Task Analysis Report",
         "",
@@ -25,21 +36,28 @@ def build_markdown_report(results: List[Dict[str, Any]]) -> str:
         "",
         "## Summary",
         "",
-        "| # | Issue | Type | Score | Verdict |",
-        "|---|---|---|---|---|",
+        _markdown_table_row(summary_headers),
+        _markdown_table_row(["---"] * len(summary_headers)),
     ]
 
     for index, result in enumerate(results, start=1):
         issue_key = result.get("jira_key") or result.get("key") or f"Issue {index}"
-        issue_type = result.get("input_element_type", "N/A")
-        score = result.get("overall_score", "N/A")
-        verdict = result.get("verdict", "N/A")
-        lines.append(
-            "| "
-            f"{index} | {_escape_table_cell(issue_key)} | "
-            f"{_escape_table_cell(issue_type)} | {_escape_table_cell(score)} | "
-            f"{_escape_table_cell(verdict)} |"
+        issue_type = result.get("input_element_type", "")
+        row = [index, issue_key, issue_type]
+        criterion_scores = _extract_criterion_scores(result)
+        row.extend(
+            criterion_scores[score_index] if score_index < len(criterion_scores) else ""
+            for score_index in range(max_criteria_count)
         )
+        if "overall_score" in result:
+            row.append(result["overall_score"])
+        elif "Score" in summary_headers:
+            row.append("")
+        if "verdict" in result:
+            row.append(result["verdict"])
+        elif "Verdict" in summary_headers:
+            row.append("")
+        lines.append(_markdown_table_row(row))
 
     lines.extend(["", "## Details", ""])
 
@@ -51,17 +69,19 @@ def build_markdown_report(results: List[Dict[str, Any]]) -> str:
                 f"### {index}. {issue_key}",
                 "",
                 f"- Type: {issue_type}",
-                f"- Score: {result.get('overall_score', 'N/A')}",
-                f"- Verdict: {result.get('verdict', 'N/A')}",
-                "",
             ]
         )
+        if "overall_score" in result:
+            lines.append(f"- Score: {result['overall_score']}")
+        if "verdict" in result:
+            lines.append(f"- Verdict: {result['verdict']}")
+        lines.append("")
 
-        scores = result.get("criteria_scores")
-        if isinstance(scores, dict) and scores:
+        scores = _extract_criterion_scores(result)
+        if scores:
             lines.extend(["#### Criteria Scores", ""])
-            for name, value in scores.items():
-                lines.append(f"- {name.replace('_', ' ').title()}: {value}")
+            for score_index, value in enumerate(scores, start=1):
+                lines.append(f"- К{score_index}: {value}")
             lines.append("")
 
         criteria = result.get("criteria")
@@ -93,18 +113,12 @@ def build_markdown_report(results: List[Dict[str, Any]]) -> str:
                         "",
                     ]
                 )
-            lines.extend(
-                [
-                    "#### Diagnosis",
-                    "",
-                    str(result.get("diagnosis", "No diagnosis available")),
-                    "",
-                    "#### Recommendations",
-                    "",
-                    str(result.get("recommendations", "No recommendations available")),
-                    "",
-                ]
-            )
+            if result.get("diagnosis"):
+                lines.extend(["#### Diagnosis", "", str(result["diagnosis"]), ""])
+            if result.get("recommendations"):
+                lines.extend(
+                    ["#### Recommendations", "", str(result["recommendations"]), ""]
+                )
 
         description = result.get("input_description")
         if description:
@@ -130,6 +144,27 @@ def save_markdown_report(results: List[Dict[str, Any]], output_path: str) -> Non
     except Exception as e:
         logger.error(f"Failed to save Markdown report: {e}")
         raise
+
+
+def _extract_criterion_scores(result: Dict[str, Any]) -> List[Any]:
+    criteria = result.get("criteria")
+    if isinstance(criteria, dict) and criteria:
+        scores = []
+        for criterion_result in criteria.values():
+            if isinstance(criterion_result, dict) and "score" in criterion_result:
+                scores.append(criterion_result["score"])
+        if scores:
+            return scores
+
+    scores = result.get("criteria_scores")
+    if isinstance(scores, dict) and scores:
+        return list(scores.values())
+
+    return []
+
+
+def _markdown_table_row(values: List[Any]) -> str:
+    return "| " + " | ".join(_escape_table_cell(value) for value in values) + " |"
 
 
 def _escape_table_cell(value: Any) -> str:
