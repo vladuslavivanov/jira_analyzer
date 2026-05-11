@@ -10,7 +10,7 @@ from urllib.request import urlopen
 
 import pytest
 
-from jira_analyzer.mock_jira.server import create_server
+from mock_jira.server import create_server
 from jira_analyzer.tasktracker.jira import JiraConnectionConfig, JiraTaskClient
 from jira_analyzer.tasktracker.jira import jira_issue_to_analysis_input
 
@@ -116,7 +116,7 @@ def test_cli_can_analyze_jira_issue_with_mock(
     mock_jira_url,
     fake_jira_module,
 ):
-    from jira_analyzer import cli
+    from jira_analyzer.app import cli
 
     output_file = Path("data/test_jira_integration_output.json")
 
@@ -154,7 +154,7 @@ def test_cli_can_analyze_jira_jql_with_mock(
     mock_jira_url,
     fake_jira_module,
 ):
-    from jira_analyzer import cli
+    from jira_analyzer.app import cli
 
     output_file = Path("data/test_jira_jql_output.json")
     markdown_file = Path("data/test_jira_jql_output.md")

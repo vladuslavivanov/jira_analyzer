@@ -14,8 +14,9 @@ dependencies = [
 ]
 
 [project.scripts]
-jira-analyzer = "jira_analyzer.cli:main"
-mock-jira = "jira_analyzer.mock_jira.server:main"
+# TODO: use project.gui-scripts for convenience
+jira-analyzer = "jira_analyzer.app.streamlit_runner:main"
+mock-jira = "mock_jira.server:main"
 
 [build-system]
 requires = ["hatchling"]
