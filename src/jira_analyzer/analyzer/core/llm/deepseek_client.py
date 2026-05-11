@@ -12,34 +12,29 @@ client = OpenAI(
     base_url=DEEPSEEK_BASE_URL,
 )
 
+DEFAULT_SYSTEM_PROMPT = (
+    "You are a strict but constructive Jira issue quality analyst. "
+    "Return only valid JSON."
+)
 
-def send_prompt(prompt: str) -> dict:
-    """
-    Отправляет промпт в DeepSeek и возвращает распарсенный JSON-ответ.
-    """
+
+def send_prompt(prompt: str, system_prompt: str | None = None) -> dict:
+    """Send a prompt to DeepSeek and return the parsed JSON response."""
     try:
         response = client.chat.completions.create(
             model=DEEPSEEK_MODEL,
             messages=[
                 {
                     "role": "system",
-                    "content": "Ты — эксперт по качеству задач в системах трекинга (Jira / YouTrack). "
-                    "Твоя задача — критически оценить описание (дескрипшен) задачи, "
-                    "выявить его слабые места и присвоить объективную оценку по заданным "
-                    "критериям. Ты строг, но конструктивен. Ты не принимаешь расплывчатые "
-                    'формулировки, эмоциональные оценки ("боюсь", "кажется") и '
-                    "отсутствие измеримых результатов.",
+                    "content": system_prompt or DEFAULT_SYSTEM_PROMPT,
                 },
                 {"role": "user", "content": prompt},
             ],
             temperature=0.2,
-            response_format={
-                "type": "json_object"
-            },  # для моделей, поддерживающих JSON mode
+            response_format={"type": "json_object"},
         )
-        content = response.choices[0].message.content
+        content = response.choices[0].message.content or ""
 
-        # Извлекаем JSON из ответа (на случай лишних символов)
         start = content.find("{")
         end = content.rfind("}") + 1
         if start != -1 and end != 0:

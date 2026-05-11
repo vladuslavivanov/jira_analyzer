@@ -30,10 +30,59 @@ Launch the interactive browser-based UI:
 uv run python src/jira_analyzer --streamlit
 ```
 
+### Local Mock Jira
+Launch a Jira-compatible mock REST API:
+```bash
+uv run mock-jira
+```
+
+The server starts at `http://127.0.0.1:8081` and supports issue lookup by key:
+```python
+from jira import JIRA
+
+jira = JIRA(server="http://127.0.0.1:8081", options={"verify": False})
+issue = jira.issue("YA-1")
+
+print(issue.key)
+print(issue.fields.summary)
+```
+
+Mock issues live in `data/mock_jira_issues.json`. The default data contains `YA-1` and `YA-2` in this format:
+```json
+[
+  {
+    "key": "YA-1",
+    "element type": "Risk",
+    "description": "Risk description"
+  }
+]
+```
+
+Analyze a single Jira issue from the CLI:
+```bash
+uv run jira-analyzer --jira-server http://127.0.0.1:8081 --jira-issue YA-1 --jira-no-verify
+```
+
+Analyze Jira issues by JQL and export a Markdown report:
+```bash
+uv run jira-analyzer --jira-server http://127.0.0.1:8081 --jql "project = YA" --jira-no-verify --markdown-output data/report.md
+```
+
+Run analysis with multiple parallel workers:
+```bash
+uv run jira-analyzer --jira-server http://127.0.0.1:8081 --jql "project = YA" --jira-no-verify --workers 2
+```
+
+The Streamlit UI also supports Jira issue lookup in the sidebar.
+It can fetch either a single issue key or a JQL query, edit the LLM prompt before
+analysis, configure the number of parallel analysis workers, preview the
+Markdown report, and download JSON or Markdown results.
+
 ## Project Structure
 
 - `src/jira_analyzer/`: Core package logic.
   - `analyzer/`: AI analysis engine and prompt templates.
+  - `mock_jira/`: Local Jira REST API mock for development.
   - `tasktracker/`: Jira data parsing and extraction.
   - `ui.py`: Streamlit web application.
   - `cli.py`: Command-line interface logic.
