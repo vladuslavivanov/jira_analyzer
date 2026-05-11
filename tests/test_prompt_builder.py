@@ -12,7 +12,7 @@ from jira_analyzer.ui import (
     SCORING_LABEL_BY_VALUE,
     _delete_all_criteria,
     _delete_selected_criteria,
-    _move_criterion_in_list,
+    _filter_criteria,
     _normalize_prompt_config,
     _set_all_criteria_scoring,
 )
@@ -33,25 +33,25 @@ def test_set_all_criteria_scoring_updates_every_criterion():
     assert SCORING_LABEL_BY_VALUE["five"] == "0-5"
 
 
-def test_move_criterion_in_list_changes_order():
+def test_filter_criteria_matches_title_and_description():
     criteria = [
-        {"title": "First"},
-        {"title": "Second"},
-        {"title": "Third"},
+        {"title": "Completeness", "description": "Has all required details"},
+        {"title": "Security", "description": "Mentions access control"},
+        {"title": "Performance", "description": "Latency requirements"},
     ]
 
-    assert _move_criterion_in_list(criteria, 1, -1) is True
-    assert [criterion["title"] for criterion in criteria] == [
-        "Second",
-        "First",
-        "Third",
-    ]
-
-    assert _move_criterion_in_list(criteria, 2, 1) is False
-    assert [criterion["title"] for criterion in criteria] == [
-        "Second",
-        "First",
-        "Third",
+    assert [
+        criterion["title"] for _, criterion in _filter_criteria(criteria, "access")
+    ] == ["Security"]
+    assert [
+        criterion["title"] for _, criterion in _filter_criteria(criteria, "PERF")
+    ] == ["Performance"]
+    assert [
+        criterion["title"] for _, criterion in _filter_criteria(criteria, "")
+    ] == [
+        "Completeness",
+        "Security",
+        "Performance",
     ]
 
 

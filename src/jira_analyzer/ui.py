@@ -70,10 +70,10 @@ TRANSLATIONS = {
         "general_prompt": "General prompt",
         "include_overall": "Include overall issue conclusion",
         "criteria": "Criteria",
+        "criteria_search": "Search criteria",
+        "no_matching_criteria": "No criteria match the search.",
         "criterion": "Criterion {number}",
         "select_criterion": "Select criterion",
-        "move_up": "Move up",
-        "move_down": "Move down",
         "remove": "Delete criterion",
         "delete_selected_criteria": "Delete selected",
         "delete_all_criteria": "Delete all",
@@ -152,10 +152,10 @@ TRANSLATIONS = {
         "general_prompt": "Общий промпт",
         "include_overall": "Добавлять общий вывод по задаче",
         "criteria": "Критерии",
+        "criteria_search": "Поиск по критериям",
+        "no_matching_criteria": "Критерии по поиску не найдены.",
         "criterion": "Критерий {number}",
         "select_criterion": "Выбрать критерий",
-        "move_up": "Переместить выше",
-        "move_down": "Переместить ниже",
         "remove": "Удалить критерий",
         "delete_selected_criteria": "Удалить выбранные",
         "delete_all_criteria": "Удалить все",
@@ -253,26 +253,6 @@ def _clear_criterion_widget_state() -> None:
             del st.session_state[key]
 
 
-def _move_criterion_in_list(criteria: list[dict], index: int, direction: int) -> bool:
-    target_index = index + direction
-    if target_index < 0 or target_index >= len(criteria):
-        return False
-
-    criteria[index], criteria[target_index] = criteria[target_index], criteria[index]
-    return True
-
-
-def _move_criterion(index: int, direction: int) -> bool:
-    moved = _move_criterion_in_list(
-        st.session_state.analysis_criteria,
-        index,
-        direction,
-    )
-    if moved:
-        _clear_criterion_widget_state()
-    return moved
-
-
 def _delete_selected_criteria(criteria: list[dict]) -> int:
     before_count = len(criteria)
     criteria[:] = [
@@ -295,6 +275,24 @@ def _remove_criterion(index: int) -> bool:
     criteria.pop(index)
     _clear_criterion_widget_state()
     return True
+
+
+def _filter_criteria(criteria: list[dict], query: str) -> list[tuple[int, dict]]:
+    normalized_query = query.strip().lower()
+    if not normalized_query:
+        return list(enumerate(criteria))
+
+    filtered = []
+    for index, criterion in enumerate(criteria):
+        haystack = " ".join(
+            [
+                str(criterion.get("title", "")),
+                str(criterion.get("description", "")),
+            ]
+        ).lower()
+        if normalized_query in haystack:
+            filtered.append((index, criterion))
+    return filtered
 
 
 def _build_prompt_config_export() -> dict:
@@ -516,6 +514,10 @@ def _render_prompt_editor(t) -> AnalysisPromptConfig:
             key="analysis_default_scoring_label",
             on_change=_apply_default_scoring_system_to_criteria,
         )
+        criteria_search = st.text_input(
+            t("criteria_search"),
+            key="criteria_search",
+        )
 
         action_cols = st.columns([1, 1, 4])
         selected_count = sum(
@@ -540,7 +542,14 @@ def _render_prompt_editor(t) -> AnalysisPromptConfig:
                 _clear_criterion_widget_state()
                 st.rerun()
 
-        for index, criterion in enumerate(st.session_state.analysis_criteria):
+        filtered_criteria = _filter_criteria(
+            st.session_state.analysis_criteria,
+            criteria_search,
+        )
+        if criteria_search and not filtered_criteria:
+            st.info(t("no_matching_criteria"))
+
+        for index, criterion in filtered_criteria:
             _render_criterion_editor(index, criterion, t)
 
         if st.button(t("add_criterion"), type="secondary"):
@@ -645,7 +654,7 @@ def _render_prompt_config_io(t) -> None:
 
 def _render_criterion_editor(index: int, criterion: dict, t) -> None:
     with st.container(border=True):
-        header_cols = st.columns([0.6, 5, 0.6, 0.6, 0.6])
+        header_cols = st.columns([0.6, 5, 0.6])
         with header_cols[0]:
             criterion["selected"] = st.checkbox(
                 t("select_criterion"),
@@ -656,24 +665,6 @@ def _render_criterion_editor(index: int, criterion: dict, t) -> None:
         with header_cols[1]:
             st.markdown(t("criterion", number=index + 1))
         with header_cols[2]:
-            if st.button(
-                "↑",
-                key=f"move_criterion_up_{index}",
-                help=t("move_up"),
-                disabled=index == 0,
-            ):
-                if _move_criterion(index, -1):
-                    st.rerun()
-        with header_cols[3]:
-            if st.button(
-                "↓",
-                key=f"move_criterion_down_{index}",
-                help=t("move_down"),
-                disabled=index == len(st.session_state.analysis_criteria) - 1,
-            ):
-                if _move_criterion(index, 1):
-                    st.rerun()
-        with header_cols[4]:
             if st.button("❌", key=f"remove_criterion_{index}", help=t("remove")):
                 if _remove_criterion(index):
                     st.rerun()
