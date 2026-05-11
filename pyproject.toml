@@ -14,16 +14,12 @@ dependencies = [
 ]
 
 [project.scripts]
-# TODO: use project.gui-scripts for convenience
+# TODO: use project.gui-scripts for convenient running app without terminal
 jira-analyzer = "jira_analyzer.app.streamlit_runner:main"
 mock-jira = "mock_jira.server:main"
 
-[build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"
-
-[tool.hatch.build.targets.wheel]
-packages = ["src/jira_analyzer"]
+[tool.uv]
+package = true
 
 [dependency-groups]
 dev = [
