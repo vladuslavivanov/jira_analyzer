@@ -10,6 +10,9 @@ from jira_analyzer.analyzer.core.llm.prompt_builder import (
 )
 from jira_analyzer.ui import (
     SCORING_LABEL_BY_VALUE,
+    _delete_all_criteria,
+    _delete_selected_criteria,
+    _move_criterion_in_list,
     _normalize_prompt_config,
     _set_all_criteria_scoring,
 )
@@ -28,6 +31,42 @@ def test_set_all_criteria_scoring_updates_every_criterion():
         "five",
     ]
     assert SCORING_LABEL_BY_VALUE["five"] == "0-5"
+
+
+def test_move_criterion_in_list_changes_order():
+    criteria = [
+        {"title": "First"},
+        {"title": "Second"},
+        {"title": "Third"},
+    ]
+
+    assert _move_criterion_in_list(criteria, 1, -1) is True
+    assert [criterion["title"] for criterion in criteria] == [
+        "Second",
+        "First",
+        "Third",
+    ]
+
+    assert _move_criterion_in_list(criteria, 2, 1) is False
+    assert [criterion["title"] for criterion in criteria] == [
+        "Second",
+        "First",
+        "Third",
+    ]
+
+
+def test_delete_selected_and_all_criteria():
+    criteria = [
+        {"title": "First", "selected": True},
+        {"title": "Second", "selected": False},
+        {"title": "Third", "selected": True},
+    ]
+
+    assert _delete_selected_criteria(criteria) == 2
+    assert criteria == [{"title": "Second", "selected": False}]
+
+    assert _delete_all_criteria(criteria) == 1
+    assert criteria == []
 
 
 def test_structured_prompt_contains_parseable_schema_for_mixed_criteria():
