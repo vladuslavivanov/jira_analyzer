@@ -71,9 +71,12 @@ TRANSLATIONS = {
         "include_overall": "Include overall issue conclusion",
         "criteria": "Criteria",
         "criterion": "Criterion {number}",
-        "move_up": "Up",
-        "move_down": "Down",
-        "remove": "Remove",
+        "select_criterion": "Select criterion",
+        "move_up": "Move up",
+        "move_down": "Move down",
+        "remove": "Delete criterion",
+        "delete_selected_criteria": "Delete selected",
+        "delete_all_criteria": "Delete all",
         "criterion_name": "Criterion name",
         "criterion_description": "Criterion description",
         "scoring_system": "Scoring system",
@@ -150,9 +153,12 @@ TRANSLATIONS = {
         "include_overall": "Добавлять общий вывод по задаче",
         "criteria": "Критерии",
         "criterion": "Критерий {number}",
-        "move_up": "Выше",
-        "move_down": "Ниже",
-        "remove": "Удалить",
+        "select_criterion": "Выбрать критерий",
+        "move_up": "Переместить выше",
+        "move_down": "Переместить ниже",
+        "remove": "Удалить критерий",
+        "delete_selected_criteria": "Удалить выбранные",
+        "delete_all_criteria": "Удалить все",
         "criterion_name": "Название критерия",
         "criterion_description": "Описание критерия",
         "scoring_system": "Система оценивания",
@@ -240,20 +246,55 @@ def _clear_criterion_widget_state() -> None:
         "criterion_description_",
         "criterion_scoring_",
         "criterion_review_",
+        "criterion_selected_",
     )
     for key in list(st.session_state.keys()):
         if key.startswith(prefixes):
             del st.session_state[key]
 
 
-def _move_criterion(index: int, direction: int) -> None:
-    criteria = st.session_state.analysis_criteria
+def _move_criterion_in_list(criteria: list[dict], index: int, direction: int) -> bool:
     target_index = index + direction
     if target_index < 0 or target_index >= len(criteria):
-        return
+        return False
 
     criteria[index], criteria[target_index] = criteria[target_index], criteria[index]
+    return True
+
+
+def _move_criterion(index: int, direction: int) -> bool:
+    moved = _move_criterion_in_list(
+        st.session_state.analysis_criteria,
+        index,
+        direction,
+    )
+    if moved:
+        _clear_criterion_widget_state()
+    return moved
+
+
+def _delete_selected_criteria(criteria: list[dict]) -> int:
+    before_count = len(criteria)
+    criteria[:] = [
+        criterion for criterion in criteria if not criterion.get("selected", False)
+    ]
+    return before_count - len(criteria)
+
+
+def _delete_all_criteria(criteria: list[dict]) -> int:
+    deleted_count = len(criteria)
+    criteria.clear()
+    return deleted_count
+
+
+def _remove_criterion(index: int) -> bool:
+    criteria = st.session_state.analysis_criteria
+    if index < 0 or index >= len(criteria):
+        return False
+
+    criteria.pop(index)
     _clear_criterion_widget_state()
+    return True
 
 
 def _build_prompt_config_export() -> dict:
@@ -299,6 +340,7 @@ def _normalize_prompt_config(config: dict) -> dict:
                     criterion.get("scoring_system", "percent")
                 ),
                 "include_review": bool(criterion.get("include_review", False)),
+                "selected": False,
             }
         )
 
@@ -475,6 +517,29 @@ def _render_prompt_editor(t) -> AnalysisPromptConfig:
             on_change=_apply_default_scoring_system_to_criteria,
         )
 
+        action_cols = st.columns([1, 1, 4])
+        selected_count = sum(
+            1
+            for criterion in st.session_state.analysis_criteria
+            if criterion.get("selected", False)
+        )
+        with action_cols[0]:
+            if st.button(
+                t("delete_selected_criteria"),
+                disabled=selected_count == 0,
+            ):
+                _delete_selected_criteria(st.session_state.analysis_criteria)
+                _clear_criterion_widget_state()
+                st.rerun()
+        with action_cols[1]:
+            if st.button(
+                t("delete_all_criteria"),
+                disabled=not st.session_state.analysis_criteria,
+            ):
+                _delete_all_criteria(st.session_state.analysis_criteria)
+                _clear_criterion_widget_state()
+                st.rerun()
+
         for index, criterion in enumerate(st.session_state.analysis_criteria):
             _render_criterion_editor(index, criterion, t)
 
@@ -485,6 +550,7 @@ def _render_prompt_editor(t) -> AnalysisPromptConfig:
                     "description": "",
                     "scoring_system": st.session_state.analysis_default_scoring_system,
                     "include_review": False,
+                    "selected": False,
                 }
             )
             st.rerun()
@@ -537,6 +603,7 @@ def _ensure_prompt_state() -> None:
                 "description": criterion.description,
                 "scoring_system": criterion.scoring_system,
                 "include_review": criterion.include_review,
+                "selected": False,
             }
             for criterion in defaults.criteria
         ]
@@ -578,30 +645,38 @@ def _render_prompt_config_io(t) -> None:
 
 def _render_criterion_editor(index: int, criterion: dict, t) -> None:
     with st.container(border=True):
-        header_cols = st.columns([5, 1, 1, 1])
+        header_cols = st.columns([0.6, 5, 0.6, 0.6, 0.6])
         with header_cols[0]:
-            st.markdown(t("criterion", number=index + 1))
+            criterion["selected"] = st.checkbox(
+                t("select_criterion"),
+                value=bool(criterion.get("selected", False)),
+                key=f"criterion_selected_{index}",
+                label_visibility="collapsed",
+            )
         with header_cols[1]:
-            st.button(
-                t("move_up"),
-                key=f"move_criterion_up_{index}",
-                disabled=index == 0,
-                on_click=_move_criterion,
-                args=(index, -1),
-            )
+            st.markdown(t("criterion", number=index + 1))
         with header_cols[2]:
-            st.button(
-                t("move_down"),
-                key=f"move_criterion_down_{index}",
-                disabled=index == len(st.session_state.analysis_criteria) - 1,
-                on_click=_move_criterion,
-                args=(index, 1),
-            )
+            if st.button(
+                "↑",
+                key=f"move_criterion_up_{index}",
+                help=t("move_up"),
+                disabled=index == 0,
+            ):
+                if _move_criterion(index, -1):
+                    st.rerun()
         with header_cols[3]:
-            if st.button(t("remove"), key=f"remove_criterion_{index}"):
-                st.session_state.analysis_criteria.pop(index)
-                _clear_criterion_widget_state()
-                st.rerun()
+            if st.button(
+                "↓",
+                key=f"move_criterion_down_{index}",
+                help=t("move_down"),
+                disabled=index == len(st.session_state.analysis_criteria) - 1,
+            ):
+                if _move_criterion(index, 1):
+                    st.rerun()
+        with header_cols[4]:
+            if st.button("❌", key=f"remove_criterion_{index}", help=t("remove")):
+                if _remove_criterion(index):
+                    st.rerun()
 
         criterion["title"] = st.text_input(
             t("criterion_name"),
