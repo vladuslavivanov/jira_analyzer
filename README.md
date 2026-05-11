@@ -18,47 +18,27 @@ Tool for automatic data collection and analysis of Jira task tracker with AI-dri
 
 The project uses a unified entry point via `python -m jira_analyzer`.
 
-### Command Line Interface (CLI)
-Run the analysis on a JSON file and save the results:
-```bash
-uv run python src/jira_analyzer --input data/input.json --output data/output.json
-```
-
 ### Web User Interface (Streamlit)
 Launch the interactive browser-based UI:
+
 ```bash
-uv run python src/jira_analyzer --streamlit
+# as project script:
+uv run jira-analyzer
+
+# or as python module:
+python -m jira_analyzer
+
+# or directly with streamlit:
+streamlit run src/jira_analyzer/app/streamlit.py
 ```
 
-### Local Mock Jira
-Launch a Jira-compatible mock REST API:
+Optional command line interface (CLI):
 ```bash
-uv run mock-jira
-```
-
-The server starts at `http://127.0.0.1:8081` and supports issue lookup by key:
-```python
-from jira import JIRA
-
-jira = JIRA(server="http://127.0.0.1:8081", options={"verify": False})
-issue = jira.issue("YA-1")
-
-print(issue.key)
-print(issue.fields.summary)
-```
-
-Mock issues live in `data/mock_jira_issues.json`. The default data contains `YA-1` and `YA-2` in this format:
-```json
-[
-  {
-    "key": "YA-1",
-    "element type": "Risk",
-    "description": "Risk description"
-  }
-]
+uv run python src/jira_analyzer/app/cli.py --input data/input.json --output data/output.json
 ```
 
 Analyze a single Jira issue from the CLI:
+
 ```bash
 uv run jira-analyzer --jira-server http://127.0.0.1:8081 --jira-issue YA-1 --jira-no-verify
 ```
@@ -78,13 +58,41 @@ It can fetch either a single issue key or a JQL query, edit the LLM prompt befor
 analysis, configure the number of parallel analysis workers, preview the
 Markdown report, and download JSON or Markdown results.
 
+
+### Local Mock Jira
+Launch a Jira-compatible mock REST API service:
+
+```bash
+# as project script:
+uv run mock-jira
+
+# or as python module:
+python -m mock_jira
+```
+
+The server starts at `http://127.0.0.1:8081` and supports issue lookup by key:
+
+Mock issues live in `data/mock_jira_issues.json`. The default data contains `YA-1` and `YA-2` in this format:
+```json
+[
+  {
+    "key": "YA-1",
+    "element type": "Risk",
+    "description": "Risk description"
+  }
+]
+```
+
+
 ## Project Structure
 
-- `src/jira_analyzer/`: Core package logic.
-  - `analyzer/`: AI analysis engine and prompt templates.
+- `src/`
+  - jira_analyzer/`: Core package logic.
+    - `analyzer/`: AI analysis engine and prompt templates.
+    - `tasktracker/`: Jira data parsing and extraction.
+    - `app/`: Analyzer application.
+      - `streamlit.py`: Streamlit web application.
+      - `cli.py`: Command-line interface logic.
   - `mock_jira/`: Local Jira REST API mock for development.
-  - `tasktracker/`: Jira data parsing and extraction.
-  - `ui.py`: Streamlit web application.
-  - `cli.py`: Command-line interface logic.
 - `data/`: Sample input and output JSON files.
 - `tests/`: Quality assurance suite.
