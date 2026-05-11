@@ -68,9 +68,15 @@ Analyze Jira issues by JQL and export a Markdown report:
 uv run jira-analyzer --jira-server http://127.0.0.1:8081 --jql "project = YA" --jira-no-verify --markdown-output data/report.md
 ```
 
+Run analysis with multiple parallel workers:
+```bash
+uv run jira-analyzer --jira-server http://127.0.0.1:8081 --jql "project = YA" --jira-no-verify --workers 2
+```
+
 The Streamlit UI also supports Jira issue lookup in the sidebar.
 It can fetch either a single issue key or a JQL query, edit the LLM prompt before
-analysis, preview the Markdown report, and download JSON or Markdown results.
+analysis, configure the number of parallel analysis workers, preview the
+Markdown report, and download JSON or Markdown results.
 
 ## Project Structure
 

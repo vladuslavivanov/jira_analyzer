@@ -76,6 +76,12 @@ def setup_arg_parser() -> argparse.ArgumentParser:
         type=Path,
         help="Optional path for a Markdown analysis report.",
     )
+    parser.add_argument(
+        "--workers",
+        type=int,
+        default=1,
+        help="Number of parallel analysis workers (minimum: 1).",
+    )
     return parser
 
 
@@ -126,7 +132,7 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     # 2. Run Analysis
     try:
-        results = run_analysis(issues)
+        results = run_analysis(issues, worker_count=max(1, args.workers))
     except Exception as e:
         logger.error(f"Analysis failed: {e}")
         return 1

@@ -120,8 +120,9 @@ def test_cli_can_analyze_jira_issue_with_mock(
 
     output_file = Path("data/test_jira_integration_output.json")
 
-    def fake_run_analysis(issues):
+    def fake_run_analysis(issues, worker_count=1):
         assert issues[0]["jira_key"] == "YA-1"
+        assert worker_count == 1
         return [{"input_element_type": issues[0]["element type"], "overall_score": 10}]
 
     monkeypatch.setattr(cli, "run_analysis", fake_run_analysis)
@@ -158,8 +159,9 @@ def test_cli_can_analyze_jira_jql_with_mock(
     output_file = Path("data/test_jira_jql_output.json")
     markdown_file = Path("data/test_jira_jql_output.md")
 
-    def fake_run_analysis(issues):
+    def fake_run_analysis(issues, worker_count=1):
         assert [issue["jira_key"] for issue in issues] == ["YA-1", "YA-2"]
+        assert worker_count == 2
         return [
             {
                 "jira_key": issue["jira_key"],
@@ -184,6 +186,8 @@ def test_cli_can_analyze_jira_jql_with_mock(
                 str(output_file),
                 "--markdown-output",
                 str(markdown_file),
+                "--workers",
+                "2",
             ]
         )
 
