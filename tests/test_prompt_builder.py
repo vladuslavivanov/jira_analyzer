@@ -8,7 +8,7 @@ from jira_analyzer.analyzer.core.llm.prompt_builder import (
     CriterionConfig,
     build_structured_prompt,
 )
-from jira_analyzer.ui import (
+from jira_analyzer.app.streamlit import (
     SCORING_LABEL_BY_VALUE,
     _apply_prompt_config_to_state,
     _build_results_table,
@@ -74,15 +74,15 @@ def test_delete_selected_and_all_criteria():
 
 
 def test_sync_criterion_selection_from_widget_state(monkeypatch):
-    from jira_analyzer import ui
+    from jira_analyzer.app import streamlit
 
     criteria = [
         {"title": "First", "selected": False, "_ui_id": "first"},
         {"title": "Second", "selected": False, "_ui_id": "second"},
     ]
 
-    monkeypatch.setitem(ui.st.session_state, "criterion_selected_first", True)
-    monkeypatch.setitem(ui.st.session_state, "criterion_selected_second", False)
+    monkeypatch.setitem(streamlit.st.session_state, "criterion_selected_first", True)
+    monkeypatch.setitem(streamlit.st.session_state, "criterion_selected_second", False)
 
     _sync_criterion_selection_from_widgets(criteria)
 
@@ -90,15 +90,15 @@ def test_sync_criterion_selection_from_widget_state(monkeypatch):
 
 
 def test_sync_criterion_selection_ignores_stale_index_widget_state(monkeypatch):
-    from jira_analyzer import ui
+    from jira_analyzer.app import streamlit
 
     criteria = [
         {"title": "First", "selected": False, "_ui_id": "stable_first"},
         {"title": "Second", "selected": False, "_ui_id": "stable_second"},
     ]
 
-    monkeypatch.setitem(ui.st.session_state, "criterion_selected_0", True)
-    monkeypatch.setitem(ui.st.session_state, "criterion_selected_stable_second", True)
+    monkeypatch.setitem(streamlit.st.session_state, "criterion_selected_0", True)
+    monkeypatch.setitem(streamlit.st.session_state, "criterion_selected_stable_second", True)
 
     _sync_criterion_selection_from_widgets(criteria)
     _delete_selected_criteria(criteria)
@@ -107,10 +107,10 @@ def test_sync_criterion_selection_ignores_stale_index_widget_state(monkeypatch):
 
 
 def test_prompt_config_import_replaces_existing_criteria(monkeypatch):
-    from jira_analyzer import ui
+    from jira_analyzer.app import streamlit
 
     monkeypatch.setitem(
-        ui.st.session_state,
+        streamlit.st.session_state,
         "analysis_criteria",
         [
             {"title": "Old first", "description": "Old", "_ui_id": "old_first"},
@@ -136,10 +136,10 @@ def test_prompt_config_import_replaces_existing_criteria(monkeypatch):
 
     _apply_prompt_config_to_state(config)
 
-    assert [criterion["title"] for criterion in ui.st.session_state.analysis_criteria] == [
+    assert [criterion["title"] for criterion in streamlit.st.session_state.analysis_criteria] == [
         "Imported only"
     ]
-    assert ui.st.session_state.analysis_criteria[0]["_ui_id"] != "old_first"
+    assert streamlit.st.session_state.analysis_criteria[0]["_ui_id"] != "old_first"
 
 
 def test_extract_criterion_scores_prefers_detailed_scores():
