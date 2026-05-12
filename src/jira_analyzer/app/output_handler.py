@@ -1,13 +1,24 @@
 import json
+from pathlib import Path
 from typing import Any, Dict, List
 
+from jira_analyzer.storage.sqlite_repository import SqliteAnalysisResultRepository
 from jira_analyzer.utils.logger import setup_logger
 
 logger = setup_logger(__name__)
 
 
 def save_results(results: List[Dict[str, Any]], output_path: str) -> None:
-    """Сохраняет список результатов в JSON-файл."""
+    """Save analysis results to JSON file or SQLite database."""
+    if output_path.lower().endswith(".db"):
+        self_path = Path(output_path)
+        repository = SqliteAnalysisResultRepository(self_path)
+        run_id = repository.save_results(results)
+        logger.info(
+            f"Saved {len(results)} results to SQLite database {output_path} (run_id={run_id})"
+        )
+        return
+
     try:
         with open(output_path, "w", encoding="utf-8") as f:
             json.dump(results, f, ensure_ascii=False, indent=2)

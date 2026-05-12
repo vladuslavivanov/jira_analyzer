@@ -801,7 +801,7 @@ def _load_json_issues(uploaded_file, use_sample: bool, t) -> list[dict]:
         return data
 
     if use_sample:
-        project_root = Path(__file__).resolve().parents[2]
+        project_root = Path(__file__).resolve().parents[3]
         sample_path = project_root / "data" / "input.json"
         if not sample_path.exists():
             raise FileNotFoundError(t("sample_not_found", path=sample_path))

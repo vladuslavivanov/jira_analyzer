@@ -43,7 +43,7 @@ def setup_arg_parser() -> argparse.ArgumentParser:
         "-o",
         type=Path,
         default=DEFAULT_OUTPUT_FILE,
-        help="Path to output JSON file (default: data/output.json)",
+        help="Path to output JSON file or SQLite DB (default: data/output.json)",
     )
     parser.add_argument(
         "--jira-issue",
