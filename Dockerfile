@@ -1,8 +1,8 @@
 FROM python:3.12-bookworm
 
 # Setup build system
-COPY --from=ghrc.io/astral-sh/uv:latest /uv /uvx /bin/
-ENV UV_COMPILE_BYTECODE=1 UV_LINK_MODE=COPY UV_NO_DEV=1
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
+ENV UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy UV_NO_DEV=1
 
 
 # Install dependencies in layer cache to reduce build time
@@ -22,4 +22,4 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --locked
 
 
-CMD ["uv", "run", "src/jira_analyzer/main.py"]
+CMD ["uv", "run", "jira-analyzer"]

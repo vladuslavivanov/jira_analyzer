@@ -58,7 +58,6 @@ It can fetch either a single issue key or a JQL query, edit the LLM prompt befor
 analysis, configure the number of parallel analysis workers, preview the
 Markdown report, and download JSON or Markdown results.
 
-
 ### Local Mock Jira
 Launch a Jira-compatible mock REST API service:
 
@@ -83,6 +82,18 @@ Mock issues live in `data/mock_jira_issues.json`. The default data contains `YA-
 ]
 ```
 
+### Run with Docker
+
+```sh
+# build image
+docker build -t jira-analyzer:latest .
+
+# run application
+docker run -t -p 8501:8501 jira-analyzer:latest
+
+# run mock jira application
+docker run -t -p 8081:8081 jira-analyzer:latest sh -c "uv run mock-jira"
+```
 
 ## Project Structure
 
