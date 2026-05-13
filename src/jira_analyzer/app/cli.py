@@ -17,7 +17,7 @@ from jira_analyzer.utils.logger import setup_logger
 
 # Constants for defaults
 SCRIPT_DIR = Path(__file__).parent.resolve()
-PROJECT_ROOT = SCRIPT_DIR.parent.parent # ipkn-jira-ai-linter/jira_analyzer
+PROJECT_ROOT = SCRIPT_DIR.parent.parent.parent
 DEFAULT_DATA_DIR = PROJECT_ROOT / "data"
 DEFAULT_INPUT_FILE = DEFAULT_DATA_DIR / "input.json"
 DEFAULT_OUTPUT_FILE = DEFAULT_DATA_DIR / "output.json"
