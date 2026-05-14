@@ -139,8 +139,19 @@ def build_markdown_report(results: List[Dict[str, Any]]) -> str:
             )
         if "Verdict" in summary_headers:
             average_row.append("")
-        lines.append(_markdown_table_row(["---"] * len(summary_headers)))
-        lines.append(_markdown_table_row(average_row))
+
+    # Criteria Statistics Table
+    if all_criteria_keys:
+        lines.extend(["", "## Criteria Statistics", "",])
+        lines.append(_markdown_table_row(["Criterion", "Average Score", "Scoring System"]))
+        lines.append(_markdown_table_row(["---", "---", "---"]))
+        for key, count in zip(all_criteria_keys, score_counts):
+            if count > 0:
+                avg = total_scores[all_criteria_keys.index(key)] / count
+                scoring = criteria_info.get(key, {}).get("scoring_system", "")
+                title = criteria_info.get(key, {}).get("title", key.replace("_", " ").title())
+                lines.append(_markdown_table_row([title, f"{avg:.2f}", scoring]))
+        lines.append("")
 
     if criteria_info:
         lines.extend(["", "## Evaluation Criteria", ""])
@@ -161,14 +172,14 @@ def build_markdown_report(results: List[Dict[str, Any]]) -> str:
 
     zombie_tasks = [result for result in results if _is_zombie_task(result)]
     if zombie_tasks:
-        lines.extend(["", "## Zombie Tasks", ""])
+        lines.extend(["", "## Zombie Tasks", "",])
         lines.append(f"Found {len(zombie_tasks)} tasks not updated for 30+ days:")
         for result in zombie_tasks:
             issue_key = result.get("jira_key") or result.get("key") or "Unknown"
             lines.append(f"- {issue_key}")
         lines.append("")
 
-    lines.extend(["", "## Issue Details", ""])
+    lines.extend(["", "## Issue Details", "",])
 
     for index, result in enumerate(results, start=1):
         issue_key = result.get("jira_key") or result.get("key") or f"Issue {index}"
@@ -188,18 +199,19 @@ def build_markdown_report(results: List[Dict[str, Any]]) -> str:
             lines.append(f"- Updated: {updated_at}")
             if _is_zombie_task(result):
                 lines.append("- **Zombie Task**: Not updated for 30+ days")
-        if "overall_score" in result:
-            lines.append(f"- Score: {result['overall_score']}")
+        if "total_score" in result or 'analysis' in result and 'total_score' in result.get('analysis', {}):
+            score = result.get('total_score') or result.get('analysis', {}).get('total_score', '')
+            lines.append(f"- Score: {score}")
         if "verdict" in result:
             lines.append(f"- Verdict: {result['verdict']}")
         lines.append("")
 
-        criteria = result.get("criteria")
+        criteria = result.get("criteria") or (result.get('analysis', {}) or {}).get("criteria", {})
         if isinstance(criteria, dict) and criteria:
-            lines.extend(["#### Criteria Details", ""])
+            lines.extend(["#### Criteria Details", "",])
             lines.append(
                 _markdown_table_row(
-                    ["Criterion", "Score", "Review", "Recommendation"]
+                    ["Criterion", "Score", "Review", "Recommendations"]
                 )
             )
             lines.append(_markdown_table_row(["---", "---", "---", "---"]))
@@ -213,30 +225,37 @@ def build_markdown_report(results: List[Dict[str, Any]]) -> str:
                 )
                 score = criterion_result.get("score", "N/A")
                 review = criterion_result.get("review", "")
-                recommendation = criterion_result.get("recommendation", "")
+                recs = criterion_result.get("recommendations", [])
+                if isinstance(recs, list):
+                    recommendation = " ".join([f"{r.strip()}" for r in recs if r.strip()])
+                else:
+                    recommendation = str(recs) if recs else ""
                 lines.append(
                     _markdown_table_row([title, score, review, recommendation])
                 )
-            lines.append("")
+            lines.append("\n")
 
         if "error" in result:
-            lines.extend(["#### Error", "", str(result["error"]), ""])
+            lines.extend(["#### Error", "", str(result["error"]), "",])
         else:
-            if result.get("overall_conclusion"):
+            conclusion = result.get("overall_conclusion") or result.get('analysis', {}).get("overall_conclusion", '')
+            if conclusion:
                 lines.extend(
                     [
                         "#### Overall Conclusion",
                         "",
-                        str(result["overall_conclusion"]),
+                        str(conclusion),
                         "",
                     ]
                 )
-            if result.get("diagnosis"):
-                lines.extend(["#### Diagnosis", "", str(result["diagnosis"]), ""])
-            if result.get("recommendations"):
-                lines.extend(
-                    ["#### Recommendations", "", str(result["recommendations"]), ""]
-                )
+            diagnosis = result.get("diagnosis") or result.get('analysis', {}).get("diagnosis", '')
+            if diagnosis:
+                lines.extend(["#### Diagnosis", "", str(diagnosis), "",])
+            # recs = result.get("recommendations") or result.get('analysis', {}).get("recommendations", [])
+            # if recs:
+            #     lines.extend(
+            #         ["#### Recommendations", "", "\n".join(recs) if isinstance(recs, list) else str(recs), "",]
+            #     )
 
         description = result.get("input_description")
         if description:

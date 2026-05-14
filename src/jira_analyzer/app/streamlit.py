@@ -13,6 +13,7 @@ from jira_analyzer.analyzer.engine import (
     run_analysis,
 )
 from jira_analyzer.app.output_handler import build_markdown_report
+from jira_analyzer.storage import SqliteAnalysisResultRepository
 from jira_analyzer.tasktracker.jira import (
     JiraConnectionConfig,
     fetch_issue,
@@ -502,6 +503,8 @@ def main() -> None:
             value=not uploaded_file,
         )
 
+    db_path = st.sidebar.text_input("Database Path", value="data/analysis.db", help="Path to SQLite database for intermediate results")
+
     if st.button(t("run_analysis"), type="primary"):
         st.session_state.analysis_results = None
         try:
@@ -527,11 +530,13 @@ def main() -> None:
             with st.spinner(
                 t("analyzing", count=len(issues), workers=int(worker_count))
             ):
+                repo = SqliteAnalysisResultRepository(db_path)
                 results = run_analysis(
                     issues,
                     prompt_config=prompt_config,
                     worker_count=int(worker_count),
                     split_by_criterion=split_by_criterion,
+                    repo=repo,
                 )
 
             st.session_state.analysis_results = results
@@ -884,12 +889,10 @@ def _is_closed_status_streamlit(issue: dict) -> bool:
 
 
 def _render_results(results: list[dict], t) -> None:
-    df = pd.DataFrame(results)
-    table_df = _build_results_table(results)
     markdown_report = build_markdown_report(results)
 
-    json_tab, report_tab, table_tab, details_tab = st.tabs(
-        ["JSON", t("markdown_report"), t("table"), t("details")]
+    json_tab, report_tab = st.tabs(
+        ["JSON", t("markdown_report")]
     )
 
     with json_tab:
@@ -910,78 +913,7 @@ def _render_results(results: list[dict], t) -> None:
             mime="text/markdown",
         )
 
-    with table_tab:
-        st.dataframe(table_df if not table_df.empty else df, width="stretch")
-
-    with details_tab:
-        for index, result in enumerate(results, start=1):
-            header_name = (
-                result.get("jira_key")
-                or result.get("key")
-                or result.get("input_element_type")
-                or "Unknown"
-            )
-            st.subheader(t("issue", number=index, name=header_name))
-
-            if "error" in result:
-                st.error(t("failed_issue", error=result["error"]))
-                st.write(t("original_description"))
-                st.info(result.get("input_description", t("no_description")))
-                st.divider()
-                continue
-
-            col1, col2 = st.columns([1, 3])
-            with col1:
-                if "overall_score" in result:
-                    st.metric(t("overall_score"), result["overall_score"])
-                if "verdict" in result:
-                    st.write(f"{t('verdict')}: {result['verdict']}")
-
-                scores = _extract_criterion_scores(result)
-                if scores:
-                    st.write(t("criteria_breakdown"))
-                    for score_index, value in enumerate(scores, start=1):
-                        st.write(f"- К{score_index}: {value}")
-
-            with col2:
-                st.write(t("original_description"))
-                st.info(result.get("input_description", t("no_description")))
-
-                st.write(t("diagnosis"))
-                st.write(result.get("diagnosis", t("no_diagnosis")))
-
-                criteria = result.get("criteria", {})
-                if isinstance(criteria, dict) and criteria:
-                    st.write(t("criteria_reviews"))
-                    for key, criterion_result in criteria.items():
-                        if not isinstance(criterion_result, dict):
-                            continue
-                        title = criterion_result.get(
-                            "title",
-                            key.replace("_", " ").title(),
-                        )
-                        score = criterion_result.get("score", "N/A")
-                        scoring_system = criterion_result.get(
-                            "scoring_system",
-                            "N/A",
-                        )
-                        st.markdown(f"**{title}**: {score} ({scoring_system})")
-                        if criterion_result.get("review"):
-                            st.write(criterion_result["review"])
-
-                if result.get("overall_conclusion"):
-                    st.write(t("overall_conclusion"))
-                    st.write(result["overall_conclusion"])
-
-                st.write(t("recommendations"))
-                st.markdown(
-                    result.get(
-                        "recommendations",
-                        t("no_recommendations"),
-                    )
-                )
-
-            st.divider()
+    st.divider()
 
 
 if __name__ == "__main__":

@@ -62,7 +62,7 @@ def build_prompt_from_template(
     template: str,
 ) -> str:
     """
-    Forms a prompt for the LLM based on the element type and description.
+    Forms a prompt for the LLM based on the element_type and description.
 
     We use .replace() instead of .format() to avoid conflicts with literal curly
     braces used in JSON examples inside the template.
@@ -117,8 +117,12 @@ Output requirements:
 - Put every criterion result into the top-level "criteria" object.
 - Each criterion result must include title, description, scoring_system, and score.
 - Include a criterion review field only when that criterion explicitly asks for it.
+- For each criterion, include recommendations as an array of 1-3 specific suggestions based on the score for that criterion.
 - Put a compact score map into "criteria_scores" for downstream parsing.
 - criteria_scores values must mirror the matching criteria.*.score values.
+- Compute total_score as the average of all criteria_scores.
+- Aggregate all unique criterion recommendations into the top-level recommendations list.
+- Provide a list of recommendations for improving the issue description based on the analysis.
 - Do not add criteria that are not listed in the schema.
 - For binary criteria, score must be 0 or 1.
 - For percent criteria, score must be an integer from 0 to 100.
@@ -141,7 +145,7 @@ def get_default_prompt_config() -> AnalysisPromptConfig:
 
 def build_prompt(element_type: str, description: str, prompt_file: TextIO) -> str:
     """
-    Forms a prompt for the LLM based on the element type and description.
+    Forms a prompt for the LLM based on the element_type and description.
 
     Note: We use .replace() instead of .format() to avoid conflicts with
     the literal curly braces used in the JSON structure within the template.
@@ -212,12 +216,28 @@ def _build_json_schema_text(
         }
         if criterion.include_review:
             criterion_result["review"] = "Criterion-specific review."
+        criterion_result["recommendations"] = {
+            "type": "array",
+            "items": {"type": "string"},
+            "description": "1-3 specific recommendations for this criterion based on the score"
+        }
         criteria_schema[key] = criterion_result
         score_schema[key] = _score_schema_label(criterion.scoring_system)
 
     schema = {
         "criteria": criteria_schema,
         "criteria_scores": score_schema,
+        "total_score": {
+            "type": "number",
+            "description": "Overall score as the average of all criteria scores"
+        },
+        "recommendations": {
+            "type": "array",
+            "items": {
+                "type": "string"
+            },
+            "description": "Aggregated list of unique recommendations from all criteria"
+        },
     }
     if include_overall_conclusion:
         schema["overall_conclusion"] = "Overall conclusion for the issue."
