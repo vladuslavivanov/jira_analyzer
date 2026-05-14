@@ -172,6 +172,10 @@ This improves:
 
 ---
 
+Architectural decisions are also described in [./architecture.md](./architecture.md).
+
+---
+
 # 3.2 Component Architecture
 
 # Presentation Layer
