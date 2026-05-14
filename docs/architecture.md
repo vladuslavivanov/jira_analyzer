@@ -1,169 +1,339 @@
-# Jira AI Analyzer - Current Architecture Specification
+# Architecture Description
 
-**Date:** May 12, 2026  
-**Version:** 0.1.0  
-**Status:** Post-Phase 1 Refactoring
+# 1. Architectural Overview
 
-## System Overview
+The system is a modular AI-driven Jira task analysis platform designed for:
 
-Jira AI Analyzer is a containerized microservice application that performs AI-driven quality analysis of Jira task tracker issues. It supports parallel processing, multiple LLM providers, and flexible storage backends.
+* automated issue inspection,
+* multi-criteria AI evaluation,
+* local/offline experimentation,
+* simplified deployment.
 
-## Core Components
+The architecture follows a layered component-oriented approach with:
 
-### 1. **Analysis Service** (`src/jira_analyzer/analyzer/service.py`)
-- **Purpose:** Orchestrates analysis workflows and LLM usage
-- **Features:**
-  - Parallel issue processing with configurable workers
-  - Split-by-criterion analysis for non-reasoning LLMs
-  - LLM provider abstraction with request queuing
-  - Error handling and result merging
+* presentation layer,
+* orchestration layer,
+* AI analysis layer,
+* integration layer,
+* persistence layer.
 
-### 2. **LLM Client** (`src/jira_analyzer/analyzer/core/llm/client.py`)
-- **Purpose:** Manages queued LLM requests with concurrency control
-- **Features:**
-  - Configurable worker pools
-  - Request queuing and batching
-  - Async support for future enhancements
-
-### 3. **LLM Provider Interface** (`src/jira_analyzer/analyzer/core/llm/provider.py`)
-- **Purpose:** Abstraction for LLM communication
-- **Implementations:**
-  - DeepSeekProvider (OpenAI-compatible API)
-  - Extensible for future providers (OpenAI, Claude, etc.)
-
-### 4. **Analysis Engine** (`src/jira_analyzer/analyzer/engine.py`)
-- **Purpose:** Simplified wrapper delegating to AnalysisService
-- **Features:** Backward compatibility with existing CLI/Streamlit code
-
-### 5. **Storage Layer** (`src/jira_analyzer/storage/`)
-- **Purpose:** Flexible result persistence
-- **Implementations:**
-  - **SqliteAnalysisResultRepository**: SQLite database storage
-  - **File-based**: JSON file output (legacy)
-- **Interface:** `AnalysisResultRepository` abstraction
-
-### 6. **User Interfaces**
-- **Streamlit Web UI** (`src/jira_analyzer/app/streamlit.py`): Interactive browser interface
-- **CLI** (`src/jira_analyzer/app/cli.py`): Command-line interface with uv build tool
-- **Unified Entry Points:** Both interfaces delegate to AnalysisService
-
-### 7. **Task Tracker Integration**
-- **Jira Client** (`src/jira_analyzer/tasktracker/jira/jira_client.py`): REST API communication
-- **Jira Parser** (`src/jira_analyzer/tasktracker/jira/jira_parser.py`): Data transformation
-- **Mock Jira Server** (`src/mock_jira/server.py`): Testing double
-
-### 8. **Configuration & Utils**
-- **Config** (`src/jira_analyzer/utils/config.py`): Environment-based configuration
-- **Logger** (`src/jira_analyzer/utils/logger.py`): Structured logging
-- **Prompt Builder** (`src/jira_analyzer/analyzer/core/llm/prompt_builder.py`): Template-based prompts
-
-## Data Flow
-
-```
-User Input (CLI/Web UI)
-    ↓
-Analysis Service
-    ├─→ LLM Client ─→ LLM Provider ─→ DeepSeek API
-    ├─→ Task Tracker ─→ Jira Client ─→ Real/Mock Jira
-    └─→ Progress Tracking ─→ Storage Layer (Analysis Sessions)
-        ↓
-    Analysis Results
-        ├─→ Storage Layer ─→ SQLite DB (Persistent Results)
-        ├─→ UI Access ─→ Streamlit (Real-time Progress/Results)
-        └─→ Report Generation ─→ Markdown/Statistics (From Stored Data)
-```
-
-## Key Architectural Decisions
-
-### 1. **Service Layer Pattern**
-- **Decision:** Extract orchestration logic into dedicated AnalysisService
-- **Rationale:** Separate algorithm from workflow coordination
-- **Benefit:** Better testability and maintainability
-
-### 2. **Provider Abstraction**
-- **Decision:** LLM provider interface with pluggable implementations
-- **Rationale:** Enable multi-provider support without code changes
-- **Benefit:** Future-proof for different LLM backends
-
-### 3. **Repository Pattern for Storage**
-- **Decision:** Abstract data persistence behind repository interfaces
-- **Rationale:** Decouple business logic from storage details
-- **Benefit:** Easy to swap storage backends (SQLite, PostgreSQL, cloud)
-
-### 4. **Request Queuing**
-- **Decision:** Queue LLM requests with configurable concurrency
-- **Rationale:** Handle API rate limits and optimize resource usage
-- **Benefit:** Better reliability and performance control
-
-### 5. **Split-Criteria Analysis**
-- **Decision:** Support per-criterion LLM requests for complex analysis
-- **Rationale:** Enable use with non-reasoning LLMs
-- **Benefit:** Broader LLM compatibility
-
-### 6. **Persistent Analysis State** ⭐ *NEW*
-- **Decision:** Store analysis progress and results in persistent storage
-- **Rationale:** Enable resumable analysis, UI access, and historical reporting
-- **Benefit:** User can track progress, access results from UI, generate reports from stored data
-
-### 7. **Simplified Storage Model** ⭐ *UPDATED*
-- **Decision:** Minimal data model - only issue info + analysis results
-- **Rationale:** Keep it simple for current web-service needs, future analytics can extend
-- **Benefit:** Fast implementation, easy maintenance, overwrite semantics for re-analysis
-
-## Storage Options
-
-| Backend | Use Case | Configuration | Features |
-|---------|----------|---------------|----------|
-| **SQLite** | Current implementation, simple persistence | `--output results.db` | Issue + result storage, overwrite on re-analysis |
-| **JSON Files** | Legacy, simple export | `--output results.json` | Basic result export |
-| **Future: PostgreSQL** | Enterprise scaling | Repository pattern ready | Extended analytics, concurrent access |
-
-### Storage Requirements ⭐ *UPDATED*
-- **Issue + Result Storage:** Only essential issue metadata and analysis results
-- **Overwrite Semantics:** Re-analysis replaces previous results (no history)
-- **Repository Abstraction:** SQLite now, extensible to other DBs later
-- **Future Analytics:** Schema can be extended without breaking changes
-
-## External Dependencies
-
-- **LLM Providers:** DeepSeek (primary), OpenAI-compatible APIs
-- **Task Trackers:** Jira REST API, extensible to others
-- **Build Tool:** uv (Python package manager)
-- **UI Framework:** Streamlit
-- **Database:** SQLite (built-in), extensible to others
-
-## Deployment
-
-- **Containerized:** Docker support included
-- **Entry Points:** `jira-analyzer` (web UI), `mock-jira` (test server)
-- **Environment:** Python 3.12+, virtual environment via uv
-
-## Testing Strategy
-
-- **Unit Tests:** Component isolation with mocks
-- **Integration Tests:** End-to-end workflows
-- **Mock Services:** Jira server for testing without external dependencies
-- **Provider Compatibility:** Test with different LLM backends
-
-## Future Extensions
-
-- **Multi-LLM Support:** OpenAI, Claude, local models
-- **Additional Task Trackers:** Azure DevOps, GitHub Issues
-- **Advanced Storage:** PostgreSQL, cloud databases
-- **Caching Layer:** Redis for LLM response caching
-- **Async Processing:** Full async support for high-throughput scenarios
-- **Analysis Analytics:** ⭐ Trend analysis, quality metrics, performance insights
-- **Real-time UI:** ⭐ Live progress tracking, result visualization
-- **Report Automation:** ⭐ Scheduled reports from stored analysis data
+The implementation intentionally simplifies several production concerns due to its research-oriented nature.
 
 ---
 
-**Architecture Status:** Phase 1 Complete (Foundation Layer)
-- ✅ Service layer extraction
-- ✅ LLM provider abstraction
-- ✅ Storage repository pattern
-- 🔄 **NEW:** Persistent analysis state and progress tracking
-- 🔄 **NEW:** UI-accessible results and real-time progress
-- 🔄 **NEW:** Analytics-ready data model
-- ⏳ Phase 2: Controller and task repository abstractions
-- ⏳ Phase 3: Caching and resilience patterns
+# 2. Architectural Principles
+
+## 2.1 Separation of Responsibilities
+
+Responsibilities are distributed as follows:
+
+| Layer            | Responsibility          |
+| ---------------- | ----------------------- |
+| Web UI           | User interaction        |
+| Analysis Service | Workflow orchestration  |
+| Analyzer         | AI analysis logic       |
+| Adapters/Clients | External communication  |
+| Repositories     | Persistence abstraction |
+
+---
+
+## 2.2 Simplified Monolithic Design
+
+The system is intentionally implemented as a lightweight modular monolith:
+
+* single backend process,
+* local SQLite storage,
+* embedded queue handling,
+* optional mock infrastructure.
+
+This reduces operational complexity while preserving architectural clarity.
+
+---
+
+# 3. Component Responsibilities
+
+# 3.1 Web UI (Streamlit)
+
+## Responsibilities
+
+* collect user input,
+* display reports,
+* configure task tracker access,
+* trigger analysis requests.
+
+The UI does NOT directly access repositories or databases.
+
+---
+
+# 3.2 Streamlit Web Service
+
+## Responsibilities
+
+Acts as:
+
+* HTTP/API controller,
+* bridge between UI and backend services.
+
+Responsibilities:
+
+* validate requests,
+* invoke analysis workflows,
+* request final results from Analysis Service.
+
+---
+
+# 3.3 Analysis Service
+
+## Core Orchestration Layer
+
+Owns:
+
+* analysis workflow lifecycle,
+* task batching,
+* pending/completed state management,
+* aggregation of analysis results,
+* coordination between repositories and Analyzer.
+
+This is the primary orchestrator of the system.
+
+---
+
+# 3.4 Analyzer
+
+## AI Analysis Engine
+
+Owns:
+
+* prompt preparation,
+* criteria decomposition,
+* semantic analysis execution,
+* merging partial LLM outputs.
+
+The Analyzer does NOT own:
+
+* workflow orchestration,
+* persistence,
+* concurrency management.
+
+---
+
+# 3.5 LLM Client
+
+## Responsibilities
+
+Encapsulates all LLM-provider communication.
+
+Owns:
+
+* asynchronous request queue,
+* rate limiting,
+* retries,
+* timeout handling,
+* provider communication.
+
+This simplifies concurrency management by centralizing it in one component.
+
+---
+
+# 3.6 Tasks Repository
+
+## Responsibilities
+
+Provides unified access to tasks regardless of source.
+
+Supports:
+
+* Jira API retrieval,
+* local dataset retrieval.
+
+The repository abstracts task acquisition from the orchestration layer.
+
+---
+
+# 3.7 Task Tracker Adapter
+
+## Responsibilities
+
+Transforms external task-tracker data into normalized internal domain objects.
+
+This isolates:
+
+* Jira-specific schemas,
+* transport details,
+* external field mappings.
+
+---
+
+# 3.8 Jira Client
+
+## Responsibilities
+
+Low-level communication with:
+
+* real Jira REST API,
+* mock Jira service.
+
+Handles:
+
+* HTTP requests,
+* serialization,
+* response parsing.
+
+---
+
+# 3.9 Fake Tasks Storage
+
+## Responsibilities
+
+Stores mock Jira tasks in local storage.
+
+This replaces the earlier raw "JSON Dataset" abstraction.
+
+The storage format may internally still be JSON files, but architecturally it is treated as a storage subsystem rather than direct file access.
+
+---
+
+# 3.10 Mock Jira Service
+
+## Responsibilities
+
+Provides a lightweight Jira-compatible REST API for:
+
+* local development,
+* offline testing,
+* deterministic experiments.
+
+---
+
+# 3.11 Analysis Result Repository
+
+## Responsibilities
+
+Stores:
+
+* analysis results,
+* task processing states.
+
+For simplicity, task states are stored together with results in SQLite.
+
+This is fully acceptable for:
+
+* local deployments,
+* research systems,
+* lightweight persistence requirements.
+
+Example states:
+
+* pending,
+* processing,
+* completed,
+* failed.
+
+---
+
+# 3.12 Analysis Result Storage (SQLite)
+
+## Responsibilities
+
+Persistent single-file storage containing:
+
+* analysed tasks,
+* analysis state,
+* AI-generated reports.
+
+Benefits:
+
+* portability,
+* simple backups,
+* reproducibility,
+* no external DB dependency.
+
+---
+
+# 4. Corrected High-Level Flow
+
+```text
+User
+ → Web UI
+   → Streamlit Web Service
+     → Analysis Service
+         → Tasks Repository
+             → Task Tracker Adapter
+                 → Jira Client
+                     → Jira / Mock Jira
+```
+
+Then:
+
+```text
+Analysis Service
+ → Analyzer
+     → LLM Client
+         → LLM Provider
+```
+
+Finally:
+
+```text
+Analysis Service
+ → Analysis Result Repository
+     → SQLite Storage
+```
+
+And:
+
+```text
+Web UI
+ ← Streamlit Web Service
+ ← Analysis Service
+```
+
+---
+
+# Sequence Diagram
+
+Full sequence diagram of processing is presented in [./sequence_diagram.md](./sequence_diagram.md).
+
+---
+
+# Why This Version Is Architecturally Consistent
+
+## Fixed Issues
+
+| Previous Problem                        | Corrected                                 |
+| --------------------------------------- | ----------------------------------------- |
+| UI accessed repository directly         | UI only talks to Analysis Service         |
+| Repository bypassed integration layer   | Access paths unified                      |
+| Analyzer orchestrated workflow          | Analysis Service owns orchestration       |
+| UI aggregated results                   | Backend aggregates                        |
+| JSON file treated as raw infrastructure | Fake Tasks Storage abstraction introduced |
+| Database Client inconsistency           | Removed entirely                          |
+| Mock Jira implied production dependency | Now clearly integration option            |
+
+---
+
+# Simplifications Are Reasonable
+
+For a student/research project, these decisions are technically justified:
+
+| Simplification            | Reasonable? | Why                            |
+| ------------------------- | ----------- | ------------------------------ |
+| SQLite only               | Yes         | Minimal operational complexity |
+| Task states in same table | Yes         | Simple lifecycle persistence   |
+| LLM queue inside client   | Yes         | Centralized async handling     |
+| No observability          | Yes         | Research scope                 |
+| No auth layer             | Yes         | UI-managed credentials         |
+| Optional caching omitted  | Yes         | Non-essential optimization     |
+
+---
+
+# Final Architectural Assessment
+
+The corrected version is now internally coherent and follows consistent architectural boundaries while remaining intentionally lightweight.
+
+It is now:
+
+* clean enough for thesis/research documentation,
+* realistic enough to resemble production architecture,
+* simple enough to implement fully,
+* extensible for future evolution.
