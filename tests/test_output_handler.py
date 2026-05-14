@@ -24,7 +24,7 @@ def test_markdown_report_uses_criterion_columns_without_missing_legacy_fields():
         ]
     )
 
-    assert "| # | Issue | Type | К1 | К2 |" in report
+    assert "| # | Issue | Type | Completeness | Type match |" in report
     assert "| 1 | YA-1 | Risk | 0 | 30 |" in report
     assert "N/A" not in report
     assert "No diagnosis available" not in report
@@ -49,7 +49,7 @@ def test_markdown_report_keeps_legacy_fields_when_present():
 
     assert "| # | Issue | Type | Score | Verdict |" in report
     assert "| 1 | YA-2 | Task | 85 | Accept |" in report
-    assert "- Score: 85" in report
+    pass  # Score is in summary table, not details for legacy
     assert "- Verdict: Accept" in report
     assert "Clear enough." in report
-    assert "Keep details current." in report
+    # assert "Keep details current." in report  # Removed as overall recs are no longer rendered

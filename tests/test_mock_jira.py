@@ -34,7 +34,7 @@ def test_load_issues_by_key():
     issues = load_issues()
 
     assert "YA-1" in issues
-    assert issues["YA-1"]["element type"] == "Risk"
+    assert issues["YA-1"]["element_type"] == "Risk"
     assert issues["YA-1"]["fields"]["issuetype"]["name"] == "Risk"
 
 
@@ -49,7 +49,7 @@ def test_get_issue_by_key(mock_jira_server):
     issue = get_json(f"{mock_jira_server}/rest/api/2/issue/YA-1")
 
     assert issue["key"] == "YA-1"
-    assert issue["element type"] == "Risk"
+    assert issue["element_type"] == "Risk"
     assert issue["description"].startswith("Риск: появление новых")
     assert issue["fields"]["status"]["name"] == "To Do"
 

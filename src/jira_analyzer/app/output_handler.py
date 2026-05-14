@@ -251,11 +251,6 @@ def build_markdown_report(results: List[Dict[str, Any]]) -> str:
             diagnosis = result.get("diagnosis") or result.get('analysis', {}).get("diagnosis", '')
             if diagnosis:
                 lines.extend(["#### Diagnosis", "", str(diagnosis), "",])
-            # recs = result.get("recommendations") or result.get('analysis', {}).get("recommendations", [])
-            # if recs:
-            #     lines.extend(
-            #         ["#### Recommendations", "", "\n".join(recs) if isinstance(recs, list) else str(recs), "",]
-            #     )
 
         description = result.get("input_description")
         if description:

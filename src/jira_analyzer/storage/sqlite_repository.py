@@ -206,21 +206,62 @@ class SqliteAnalysisResultRepository(AnalysisResultRepository):
     # Legacy batch methods adapted to new schema
     def save_results(self, results: List[Dict[str, Any]], run_name: str | None = None) -> int:
         """Save a list of analysis results (legacy)."""
-        for res in results:
-            task_id = res.get('key') or res.get('jira_key')
-            if task_id:
-                self.save_result(task_id, res)
-        return len(results)  # Dummy run id
+        now = datetime.now(timezone.utc).isoformat()
+        with sqlite3.connect(self.database_path) as conn:
+            for res in results:
+                task_id = res.get('key') or res.get('jira_key')
+                if not task_id:
+                    continue
+
+                # Extract fields
+                title = res.get('title', res.get('summary', ''))
+                description = res.get('description', res.get('input_description', ''))
+                status = res.get('status', '')
+                assignee = res.get('assignee', '')
+                created_at = res.get('created_at', '')
+                updated_at = res.get('updated_at', now)
+
+                # Compute total_score
+                criteria_scores = res.get('criteria_scores', {})
+                if not criteria_scores:
+                    # Legacy, extract from criteria
+                    criteria = res.get('criteria', {})
+                    criteria_scores = {k: c['score'] for k, c in criteria.items() if 'score' in c}
+                scores = [float(v) for v in criteria_scores.values() if isinstance(v, (int, float))]
+                total_score = sum(scores) / len(scores) if scores else None
+
+                summary = res.get('overall_conclusion', res.get('summary', ''))
+                if not isinstance(summary, str):
+                    summary = json.dumps(summary)
+
+                recommendations = res.get('recommendations', [])
+                if isinstance(recommendations, list):
+                    recommendations = json.dumps(recommendations)
+                elif not isinstance(recommendations, str):
+                    recommendations = json.dumps([recommendations])
+
+                raw_response = json.dumps(res, ensure_ascii=False)
+
+                conn.execute(
+                    """
+                    INSERT OR REPLACE INTO analysis_results 
+                    (task_id, title, description, status, assignee, created_at, updated_at, state, total_score, summary, recommendations, raw_response, analyzed_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, 'COMPLETED', ?, ?, ?, ?, ?)
+                    """,
+                    (task_id, title, description, status, assignee, created_at, updated_at, total_score, summary, recommendations, raw_response, now),
+                )
+            conn.commit()
+        return 1  # Dummy
 
     def get_results(self, run_id: int) -> List[Dict[str, Any]]:
         """Retrieve analysis results (legacy, ignores run_id)."""
-        return self.get_all_results()
+        full = self.get_all_results()
+        return [r['analysis'] for r in full]
 
     def get_latest_results(self) -> List[Dict[str, Any]]:
         """Retrieve the most recent analysis results (legacy)."""
         all_results = self.get_all_results()
         if all_results:
-            # Sort by analyzed_at if available
             all_results.sort(key=lambda x: x.get('analyzed_at', ''), reverse=True)
-            return all_results[:50]  # Limit
+            return [r['analysis'] for r in all_results[:50]]
         return []

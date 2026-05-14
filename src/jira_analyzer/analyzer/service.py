@@ -197,16 +197,7 @@ class AnalysisService:
         return [result for _, result in sorted(result_items)]
 
     def analyze_issues(self, issues: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-        try:
-            loop = asyncio.get_event_loop()
-        except RuntimeError:
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-        try:
-            return loop.run_until_complete(self._async_analyze_issues(issues))
-        finally:
-            if loop != asyncio.get_event_loop():
-                loop.close()
+        return asyncio.run(self._async_analyze_issues(issues))
 
     async def _async_analyze_issue(
         self,
@@ -291,12 +282,7 @@ class AnalysisService:
         total: int,
         issue: Dict[str, Any],
     ) -> Dict[str, Any]:
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        try:
-            return loop.run_until_complete(self._async_analyze_issue(idx=idx, total=total, issue=issue))
-        finally:
-            loop.close()
+        return asyncio.run(self._async_analyze_issue(idx=idx, total=total, issue=issue))
 
     async def _async_analyze_issue_criteria_split(
         self,
@@ -326,12 +312,7 @@ class AnalysisService:
         element_type: str,
         description: str,
     ) -> Dict[str, Any]:
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        try:
-            return loop.run_until_complete(self._async_analyze_issue_criteria_split(element_type, description))
-        finally:
-            loop.close()
+        return asyncio.run(self._async_analyze_issue_criteria_split(element_type, description))
 
     def _merge_split_results(self, responses: List[Dict[str, Any]]) -> Dict[str, Any]:
         merged: Dict[str, Any] = {

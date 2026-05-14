@@ -24,6 +24,12 @@ DEFAULT_OUTPUT_FILE = DEFAULT_DATA_DIR / "output.json"
 
 logger = setup_logger(__name__)
 
+def _is_closed_status(issue: dict) -> bool:
+    status = issue.get("status", "").lower()
+    closed_statuses = {"closed", "done", "resolved", "cancelled"}
+    return status in closed_statuses
+
+
 def setup_arg_parser() -> argparse.ArgumentParser:
     """
     Configures the command-line argument parser.
