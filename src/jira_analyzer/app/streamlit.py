@@ -115,6 +115,8 @@ TRANSLATIONS = {
         "no_recommendations": "No recommendations available",
         "exclude_closed": "Exclude closed tasks",
         "include_closed_tasks": "Include closed tasks",
+        "split_by_criterion": "Analyze each criterion separately",
+        "split_by_criterion_help": "When enabled, each criterion is analyzed in a separate LLM request. This provides more detailed analysis but takes longer.",
     },
     "ru": {
         "language": "Язык",
@@ -197,6 +199,8 @@ TRANSLATIONS = {
         "no_recommendations": "Рекомендации отсутствуют",
         "exclude_closed": "Исключить закрытые задачи",
         "include_closed_tasks": "Включить закрытые задачи",
+        "split_by_criterion": "Анализировать каждый критерий отдельно",
+        "split_by_criterion_help": "При включении каждый критерий анализируется в отдельном запросе к ИИ. Это обеспечивает более детальный анализ, но занимает больше времени.",
     },
 }
 
@@ -432,6 +436,11 @@ def main() -> None:
         value=1,
         step=1,
     )
+    split_by_criterion = st.sidebar.checkbox(
+        t("split_by_criterion"),
+        value=False,
+        help=t("split_by_criterion_help"),
+    )
 
     _ensure_prompt_state()
     _render_prompt_config_io(t)
@@ -522,6 +531,7 @@ def main() -> None:
                     issues,
                     prompt_config=prompt_config,
                     worker_count=int(worker_count),
+                    split_by_criterion=split_by_criterion,
                 )
 
             st.session_state.analysis_results = results

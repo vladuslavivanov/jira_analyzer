@@ -94,6 +94,11 @@ def setup_arg_parser() -> argparse.ArgumentParser:
         dest="exclude_closed",
         help="Include closed tasks in analysis.",
     )
+    parser.add_argument(
+        "--split-by-criterion",
+        action="store_true",
+        help="Analyze each criterion separately in individual LLM requests (slower but more detailed).",
+    )
     return parser
 
 
@@ -147,7 +152,11 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     # 2. Run Analysis
     try:
-        results = run_analysis(issues, worker_count=max(1, args.workers))
+        results = run_analysis(
+            issues, 
+            worker_count=max(1, args.workers),
+            split_by_criterion=getattr(args, 'split_by_criterion', False)
+        )
     except Exception as e:
         logger.error(f"Analysis failed: {e}")
         return 1

@@ -1,4 +1,5 @@
 import json
+import re
 from datetime import datetime, timedelta, timezone
 from queue import Empty, Queue
 from threading import Lock, Thread
@@ -300,27 +301,59 @@ class AnalysisService:
             "criteria_scores": {},
         }
         errors: list[str] = []
+        successful_criteria_count = 0
+        seen_criteria_keys: set[str] = set()
+        seen_score_keys: set[str] = set()
+
+        def _unique_key(base_key: str, existing_keys: set[str]) -> str:
+            if base_key not in existing_keys:
+                existing_keys.add(base_key)
+                return base_key
+
+            match = re.match(r"^(.*?)(?:_(\d+))?$", base_key)
+            if match:
+                prefix = match.group(1) or base_key
+            else:
+                prefix = base_key
+
+            suffix = 2
+            candidate = f"{prefix}_{suffix}"
+            while candidate in existing_keys:
+                suffix += 1
+                candidate = f"{prefix}_{suffix}"
+
+            existing_keys.add(candidate)
+            return candidate
 
         for response in responses:
             if not isinstance(response, dict):
                 errors.append("Non-dict response received from LLM")
                 continue
 
-            if response.get("error"):
-                errors.append(str(response["error"]))
-
             criteria = response.get("criteria")
+            response_key_map: dict[str, str] = {}
             if isinstance(criteria, dict):
-                merged["criteria"].update(criteria)
+                for key, value in criteria.items():
+                    unique_key = _unique_key(key, seen_criteria_keys)
+                    response_key_map[key] = unique_key
+                    merged["criteria"][unique_key] = value
+                    successful_criteria_count += 1
 
             scores = response.get("criteria_scores")
             if isinstance(scores, dict):
-                merged["criteria_scores"].update(scores)
+                for key, value in scores.items():
+                    unique_key = response_key_map.get(key, _unique_key(key, seen_score_keys))
+                    if unique_key not in seen_score_keys:
+                        seen_score_keys.add(unique_key)
+                    merged["criteria_scores"][unique_key] = value
+
+            if response.get("error"):
+                errors.append(str(response["error"]))
 
         if self.prompt_config and self.prompt_config.include_overall_conclusion:
             merged["overall_conclusion"] = (
-                "This analysis was produced by separate per-criterion requests. "
-                "Inspect individual criterion results for details."
+                f"This analysis was produced by separate per-criterion requests. "
+                f"Successfully analyzed {successful_criteria_count} criteria."
             )
 
         if errors:
