@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from queue import Empty, Queue
 from threading import Lock, Thread
 from typing import Any, Dict, List
@@ -12,13 +13,20 @@ from jira_analyzer.analyzer.core.llm.prompt_builder import (
     get_default_prompt_config,
 )
 from jira_analyzer.analyzer.core.llm.provider import LLMProvider
+from jira_analyzer.app.output_handler import build_markdown_report
+from jira_analyzer.tasktracker.jira import JiraConnectionConfig
+from jira_analyzer.tasktracker.repository import (
+    JiraTasksRepository,
+    JsonFileTasksRepository,
+    TasksRepository,
+)
 from jira_analyzer.utils.logger import setup_logger
 
 logger = setup_logger(__name__)
 
 
 class AnalysisService:
-    """Orchestrates Jira issue analysis requests and LLM usage."""
+    """Orchestrates Jira issue analysis requests, task acquisition, and reporting."""
 
     def __init__(
         self,
@@ -28,11 +36,13 @@ class AnalysisService:
         llm_max_workers: int | None = None,
         llm_provider: LLMProvider | None = None,
         split_by_criterion: bool = False,
+        task_repository: TasksRepository | None = None,
     ):
         self.prompt_template = prompt_template
         self.prompt_config = prompt_config
         self.worker_count = max(1, int(worker_count))
         self.split_by_criterion = split_by_criterion
+        self.task_repository = task_repository
 
         if self.prompt_config is None and self.prompt_template is None:
             self.prompt_config = get_default_prompt_config()
@@ -42,6 +52,41 @@ class AnalysisService:
             provider=provider,
             max_workers=llm_max_workers or self.worker_count,
         )
+
+    def _resolve_task_repository(
+        self,
+        jira_config: JiraConnectionConfig | None = None,
+    ) -> TasksRepository:
+        if self.task_repository is not None:
+            return self.task_repository
+
+        if jira_config is not None:
+            return JiraTasksRepository(jira_config)
+
+        return JsonFileTasksRepository()
+
+    def analyze_task(self, issue: Dict[str, Any]) -> Dict[str, Any]:
+        return self._analyze_issue(idx=1, total=1, issue=issue)
+
+    def analyze_jql(
+        self,
+        jql: str,
+        jira_config: JiraConnectionConfig | None = None,
+        max_results: int = 50,
+    ) -> List[Dict[str, Any]]:
+        repository = self._resolve_task_repository(jira_config=jira_config)
+        issues = repository.search_tasks(jql=jql, max_results=max_results)
+        return self.analyze_issues(issues)
+
+    def analyze_dataset(self, path: str) -> List[Dict[str, Any]]:
+        repository = self._resolve_task_repository()
+        issues = repository.load_dataset(path)
+        return self.analyze_issues(issues)
+
+    def generate_report(self, results: List[Dict[str, Any]], format: str = "json") -> str:
+        if format == "markdown":
+            return build_markdown_report(results)
+        return json.dumps(results, ensure_ascii=False, indent=2)
 
     def _resolve_default_provider(self) -> LLMProvider:
         import importlib
