@@ -324,8 +324,8 @@ def _is_zombie_task(result: Dict[str, Any], days_threshold: int = 30) -> bool:
     if not updated_at_str:
         return False
     try:
-        updated_at = datetime.fromisoformat(updated_at_str.replace('Z', '+00:00'))
-        now = datetime.now(timezone.utc)
+        updated_at = datetime.fromisoformat(updated_at_str.replace('Z', '+03:00') if 'Z' in updated_at_str else updated_at_str)
+        now = datetime.now(timezone(timedelta(hours=3)))
         return (now - updated_at) > timedelta(days=days_threshold)
     except (ValueError, TypeError):
         return False

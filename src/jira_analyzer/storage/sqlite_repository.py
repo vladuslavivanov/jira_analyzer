@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import json
 import sqlite3
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
+
+UTC_PLUS_3 = timezone(timedelta(hours=3))
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -65,7 +67,7 @@ class SqliteAnalysisResultRepository(AnalysisResultRepository):
 
     def update_processing(self, task_id: str) -> None:
         """Update the state to processing for a task."""
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(timezone(timedelta(hours=3))).isoformat()
         with sqlite3.connect(self.database_path) as conn:
             conn.execute(
                 "UPDATE analysis_results SET state = 'PROCESSING', analyzed_at = ? WHERE task_id = ?",
@@ -75,7 +77,7 @@ class SqliteAnalysisResultRepository(AnalysisResultRepository):
 
     def save_result(self, task_id: str, result: Dict[str, Any]) -> None:
         """Save the analysis result for a task."""
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(timezone(timedelta(hours=3))).isoformat()
 
         # Compute total_score as average of criteria_scores if available
         total_score = None
@@ -115,7 +117,7 @@ class SqliteAnalysisResultRepository(AnalysisResultRepository):
 
     def save_failed(self, task_id: str, error: str) -> None:
         """Save a failed analysis for a task."""
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(timezone(timedelta(hours=3))).isoformat()
         error_data = json.dumps({'error': error}, ensure_ascii=False)
         with sqlite3.connect(self.database_path) as conn:
             conn.execute(
@@ -206,7 +208,7 @@ class SqliteAnalysisResultRepository(AnalysisResultRepository):
     # Legacy batch methods adapted to new schema
     def save_results(self, results: List[Dict[str, Any]], run_name: str | None = None) -> int:
         """Save a list of analysis results (legacy)."""
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(timezone(timedelta(hours=3))).isoformat()
         with sqlite3.connect(self.database_path) as conn:
             for res in results:
                 task_id = res.get('key') or res.get('jira_key')
