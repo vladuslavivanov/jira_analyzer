@@ -30,12 +30,43 @@ def save_results(results: List[Dict[str, Any]], output_path: str) -> None:
 
 
 def build_markdown_report(results: List[Dict[str, Any]]) -> str:
-    max_criteria_count = max(
-        (len(_extract_criterion_scores(result)) for result in results),
-        default=0,
-    )
+    all_criteria_keys: List[str] = []
+    criteria_info: Dict[str, Dict[str, str]] = {}
+
+    for result in results:
+        criteria = result.get("criteria")
+        if isinstance(criteria, dict):
+            for key, criterion in criteria.items():
+                if key not in all_criteria_keys:
+                    all_criteria_keys.append(key)
+                if key not in criteria_info and isinstance(criterion, dict):
+                    criteria_info[key] = {
+                        "title": str(
+                            criterion.get("title", key.replace("_", " ").title())
+                        ).strip(),
+                        "description": str(criterion.get("description", "")).strip(),
+                        "scoring_system": str(
+                            criterion.get("scoring_system", ""
+                        )).strip(),
+                    }
+
+        criteria_scores = result.get("criteria_scores")
+        if isinstance(criteria_scores, dict):
+            for key in criteria_scores.keys():
+                if key not in all_criteria_keys:
+                    all_criteria_keys.append(key)
+                if key not in criteria_info:
+                    criteria_info[key] = {
+                        "title": key.replace("_", " ").title(),
+                        "description": "",
+                        "scoring_system": "",
+                    }
+
     summary_headers = ["#", "Issue", "Type"]
-    summary_headers.extend(f"К{index}" for index in range(1, max_criteria_count + 1))
+    summary_headers.extend(
+        criteria_info.get(key, {}).get("title", key.replace("_", " ").title())
+        for key in all_criteria_keys
+    )
     if any("overall_score" in result for result in results):
         summary_headers.append("Score")
     if any("verdict" in result for result in results):
@@ -52,26 +83,81 @@ def build_markdown_report(results: List[Dict[str, Any]]) -> str:
         _markdown_table_row(["---"] * len(summary_headers)),
     ]
 
+    total_scores: List[float] = [0.0] * len(all_criteria_keys)
+    score_counts: List[int] = [0] * len(all_criteria_keys)
+    total_overall_score = 0.0
+    overall_score_count = 0
+
     for index, result in enumerate(results, start=1):
         issue_key = result.get("jira_key") or result.get("key") or f"Issue {index}"
         issue_type = result.get("input_element_type", "")
         row = [index, issue_key, issue_type]
-        criterion_scores = _extract_criterion_scores(result)
-        row.extend(
-            criterion_scores[score_index] if score_index < len(criterion_scores) else ""
-            for score_index in range(max_criteria_count)
-        )
+
+        for score_index, criterion_key in enumerate(all_criteria_keys):
+            score = _extract_criterion_score_by_key(result, criterion_key)
+            row.append(score if score is not None else "")
+            if isinstance(score, (int, float)) and not isinstance(score, bool):
+                total_scores[score_index] += score
+                score_counts[score_index] += 1
+
         if "overall_score" in result:
-            row.append(result["overall_score"])
+            overall_score = result["overall_score"]
+            row.append(overall_score)
+            if isinstance(overall_score, (int, float)) and not isinstance(
+                overall_score, bool
+            ):
+                total_overall_score += overall_score
+                overall_score_count += 1
         elif "Score" in summary_headers:
             row.append("")
+
         if "verdict" in result:
             row.append(result["verdict"])
         elif "Verdict" in summary_headers:
             row.append("")
+
         lines.append(_markdown_table_row(row))
 
-    lines.extend(["", "## Details", ""])
+    if results and all_criteria_keys:
+        average_row = ["", "**Average**", ""]
+        for score_index, count in enumerate(score_counts):
+            if count:
+                average = total_scores[score_index] / count
+                average_row.append(
+                    str(int(average)) if average.is_integer() else f"{average:.2f}"
+                )
+            else:
+                average_row.append("")
+
+        if "Score" in summary_headers:
+            average_row.append(
+                str(int(total_overall_score / overall_score_count))
+                if overall_score_count and (total_overall_score / overall_score_count).is_integer()
+                else f"{total_overall_score / overall_score_count:.2f}"
+                if overall_score_count
+                else ""
+            )
+        if "Verdict" in summary_headers:
+            average_row.append("")
+        lines.append(_markdown_table_row(["---"] * len(summary_headers)))
+        lines.append(_markdown_table_row(average_row))
+
+    if criteria_info:
+        lines.extend(["", "## Evaluation Criteria", ""])
+        lines.append(_markdown_table_row(["Criterion", "Scoring", "Description"]))
+        lines.append(_markdown_table_row(["---", "---", "---"]))
+        for key in all_criteria_keys:
+            info = criteria_info.get(key, {})
+            lines.append(
+                _markdown_table_row(
+                    [
+                        info.get("title", key.replace("_", " ").title()),
+                        info.get("scoring_system", ""),
+                        info.get("description", ""),
+                    ]
+                )
+            )
+        lines.append("")
 
     zombie_tasks = [result for result in results if _is_zombie_task(result)]
     if zombie_tasks:
@@ -108,28 +194,29 @@ def build_markdown_report(results: List[Dict[str, Any]]) -> str:
             lines.append(f"- Verdict: {result['verdict']}")
         lines.append("")
 
-        scores = _extract_criterion_scores(result)
-        if scores:
-            lines.extend(["#### Criteria Scores", ""])
-            for score_index, value in enumerate(scores, start=1):
-                lines.append(f"- К{score_index}: {value}")
-            lines.append("")
-
         criteria = result.get("criteria")
         if isinstance(criteria, dict) and criteria:
             lines.extend(["#### Criteria Details", ""])
-            for name, criterion_result in criteria.items():
+            lines.append(
+                _markdown_table_row(
+                    ["Criterion", "Score", "Review", "Recommendation"]
+                )
+            )
+            lines.append(_markdown_table_row(["---", "---", "---", "---"]))
+            for key in all_criteria_keys:
+                criterion_result = criteria.get(key, {})
                 if not isinstance(criterion_result, dict):
                     continue
                 title = criterion_result.get(
                     "title",
-                    name.replace("_", " ").title(),
+                    key.replace("_", " ").title(),
                 )
                 score = criterion_result.get("score", "N/A")
-                scoring_system = criterion_result.get("scoring_system", "N/A")
-                lines.append(f"- {title}: {score} ({scoring_system})")
-                if criterion_result.get("review"):
-                    lines.append(f"  {criterion_result['review']}")
+                review = criterion_result.get("review", "")
+                recommendation = criterion_result.get("recommendation", "")
+                lines.append(
+                    _markdown_table_row([title, score, review, recommendation])
+                )
             lines.append("")
 
         if "error" in result:
@@ -165,6 +252,22 @@ def build_markdown_report(results: List[Dict[str, Any]]) -> str:
             )
 
     return "\n".join(lines).strip() + "\n"
+
+
+def _extract_criterion_score_by_key(
+    result: Dict[str, Any], criterion_key: str
+) -> Any | None:
+    criteria = result.get("criteria")
+    if isinstance(criteria, dict):
+        criterion_result = criteria.get(criterion_key)
+        if isinstance(criterion_result, dict) and "score" in criterion_result:
+            return criterion_result["score"]
+
+    criteria_scores = result.get("criteria_scores")
+    if isinstance(criteria_scores, dict) and criterion_key in criteria_scores:
+        return criteria_scores[criterion_key]
+
+    return None
 
 
 def save_markdown_report(results: List[Dict[str, Any]], output_path: str) -> None:
