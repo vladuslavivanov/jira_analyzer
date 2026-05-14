@@ -1,13 +1,13 @@
 <mxfile host="app.diagrams.net">
   <diagram name="Page-1" id="A97EHMqaYtf8SxWf_OfT">
-    <mxGraphModel dx="3553" dy="2551" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="850" pageHeight="1100" math="0" shadow="0">
+    <mxGraphModel dx="2724" dy="1748" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="850" pageHeight="1100" math="0" shadow="0">
       <root>
         <mxCell id="0" />
         <mxCell id="1" parent="0" />
         <mxCell id="uJod8HNcTFHFGRPo_LkE-9" connectable="0" parent="1" style="group" value="" vertex="1">
           <mxGeometry height="430" width="1060" x="-130" y="270" as="geometry" />
         </mxCell>
-        <object placeholders="1" c4Name="Менеджер" c4Type="Person: PMO User" c4Description="Пользователь сервиса, которому нужно оценить качество задач в подразделении.&#xa;Н-р Руководитель проектного офиса, руководить команды, и пр." label="&lt;font style=&quot;font-size: 16px&quot;&gt;&lt;b&gt;%c4Name%&lt;/b&gt;&lt;/font&gt;&lt;div&gt;[%c4Type%]&lt;/div&gt;&lt;br&gt;&lt;div&gt;&lt;font style=&quot;font-size: 11px&quot;&gt;&lt;font color=&quot;#cccccc&quot;&gt;%c4Description%&lt;/font&gt;&lt;/div&gt;" id="4ljzdX7MJXHan0I2Ug8s-1">
+        <object placeholders="1" c4Name="Пользователь" c4Type="Person: PMO User" c4Description="Пользователь сервиса, которому нужно оценить качество задач в подразделении.&#xa;Н-р Руководитель проектного офиса, руководить команды, и пр." label="&lt;font style=&quot;font-size: 16px&quot;&gt;&lt;b&gt;%c4Name%&lt;/b&gt;&lt;/font&gt;&lt;div&gt;[%c4Type%]&lt;/div&gt;&lt;br&gt;&lt;div&gt;&lt;font style=&quot;font-size: 11px&quot;&gt;&lt;font color=&quot;#cccccc&quot;&gt;%c4Description%&lt;/font&gt;&lt;/div&gt;" id="4ljzdX7MJXHan0I2Ug8s-1">
           <mxCell parent="uJod8HNcTFHFGRPo_LkE-9" style="html=1;fontSize=11;dashed=0;whiteSpace=wrap;fillColor=#083F75;strokeColor=#06315C;fontColor=#ffffff;shape=mxgraph.c4.person2;align=center;metaEdit=1;points=[[0.5,0,0],[1,0.5,0],[1,0.75,0],[0.75,1,0],[0.5,1,0],[0.25,1,0],[0,0.75,0],[0,0.5,0]];resizable=1;" vertex="1">
             <mxGeometry height="220" width="200" x="50" y="210" as="geometry" />
           </mxCell>
@@ -131,7 +131,7 @@
             </mxGeometry>
           </mxCell>
         </object>
-        <object placeholders="1" c4Name="Менеджер" c4Type="Person: PMO User" c4Description="Пользователь сервиса, которому нужно оценить качество задач в подразделении.&#xa;Н-р Руководитель проектного офиса, руководить команды, и пр." label="&lt;font style=&quot;font-size: 16px&quot;&gt;&lt;b&gt;%c4Name%&lt;/b&gt;&lt;/font&gt;&lt;div&gt;[%c4Type%]&lt;/div&gt;&lt;br&gt;&lt;div&gt;&lt;font style=&quot;font-size: 11px&quot;&gt;&lt;font color=&quot;#cccccc&quot;&gt;%c4Description%&lt;/font&gt;&lt;/div&gt;" id="uJod8HNcTFHFGRPo_LkE-5">
+        <object placeholders="1" c4Name="Пользователь" c4Type="Person: PMO User" c4Description="Пользователь сервиса, которому нужно оценить качество задач в подразделении.&#xa;Н-р Руководитель проектного офиса, руководить команды, и пр." label="&lt;font style=&quot;font-size: 16px&quot;&gt;&lt;b&gt;%c4Name%&lt;/b&gt;&lt;/font&gt;&lt;div&gt;[%c4Type%]&lt;/div&gt;&lt;br&gt;&lt;div&gt;&lt;font style=&quot;font-size: 11px&quot;&gt;&lt;font color=&quot;#cccccc&quot;&gt;%c4Description%&lt;/font&gt;&lt;/div&gt;" id="uJod8HNcTFHFGRPo_LkE-5">
           <mxCell parent="1" style="html=1;fontSize=11;dashed=0;whiteSpace=wrap;fillColor=#083F75;strokeColor=#06315C;fontColor=#ffffff;shape=mxgraph.c4.person2;align=center;metaEdit=1;points=[[0.5,0,0],[1,0.5,0],[1,0.75,0],[0.75,1,0],[0.5,1,0],[0.25,1,0],[0,0.75,0],[0,0.5,0]];resizable=1;" vertex="1">
             <mxGeometry height="220" width="200" x="-90" y="1090" as="geometry" />
           </mxCell>
@@ -172,7 +172,7 @@
             <mxGeometry height="820" width="1480" x="280" y="1940" as="geometry" />
           </mxCell>
         </object>
-        <object placeholders="1" c4Name="Web UI" c4Type="Container" c4Technology="Python, Jinja" c4Description="Графический интерфейс веб-браузера для взаимодействия с пользователем." label="&lt;font style=&quot;font-size: 16px&quot;&gt;&lt;b&gt;%c4Name%&lt;/b&gt;&lt;/font&gt;&lt;div&gt;[%c4Type%:&amp;nbsp;%c4Technology%]&lt;/div&gt;&lt;br&gt;&lt;div&gt;&lt;font style=&quot;font-size: 11px&quot;&gt;&lt;font color=&quot;#E6E6E6&quot;&gt;%c4Description%&lt;/font&gt;&lt;/div&gt;" id="aBW1-fTMISKenAxBvHfW-3">
+        <object placeholders="1" c4Name="Web UI" c4Type="Container" c4Technology="Streamlit Web UI" c4Description="Графический интерфейс веб-браузера для взаимодействия с пользователем." label="&lt;font style=&quot;font-size: 16px&quot;&gt;&lt;b&gt;%c4Name%&lt;/b&gt;&lt;/font&gt;&lt;div&gt;[%c4Type%:&amp;nbsp;%c4Technology%]&lt;/div&gt;&lt;br&gt;&lt;div&gt;&lt;font style=&quot;font-size: 11px&quot;&gt;&lt;font color=&quot;#E6E6E6&quot;&gt;%c4Description%&lt;/font&gt;&lt;/div&gt;" id="aBW1-fTMISKenAxBvHfW-3">
           <mxCell parent="1" style="shape=mxgraph.c4.webBrowserContainer2;whiteSpace=wrap;html=1;boundedLbl=1;rounded=0;labelBackgroundColor=none;strokeColor=#118ACD;fillColor=#23A2D9;strokeColor=#118ACD;strokeColor2=#0E7DAD;fontSize=12;fontColor=#ffffff;align=center;metaEdit=1;points=[[0.5,0,0],[1,0.25,0],[1,0.5,0],[1,0.75,0],[0.5,1,0],[0,0.75,0],[0,0.5,0],[0,0.25,0]];resizable=0;" vertex="1">
             <mxGeometry height="160" width="240" x="-50" y="2350" as="geometry" />
           </mxCell>
@@ -259,7 +259,7 @@
             <mxGeometry height="120" width="240" x="750" y="2600" as="geometry" />
           </mxCell>
         </object>
-        <object placeholders="1" c4Name="Controller" c4Type="Component" c4Technology="Python, &#xa;Flask/Django/FastAPI or Streamlit" c4Description="Получает запросы от пользователя" label="&lt;font style=&quot;font-size: 16px&quot;&gt;&lt;b&gt;%c4Name%&lt;/b&gt;&lt;/font&gt;&lt;div&gt;[%c4Type%: %c4Technology%]&lt;/div&gt;&lt;br&gt;&lt;div&gt;&lt;font style=&quot;font-size: 11px&quot;&gt;%c4Description%&lt;/font&gt;&lt;/div&gt;" id="vz4cJAhe5jB_btSd84LD-22">
+        <object placeholders="1" c4Name="Streamlit Web-Service" c4Type="Component" c4Technology="Python, Streamlit" c4Description="Получает запросы от пользователя" label="&lt;font style=&quot;font-size: 16px&quot;&gt;&lt;b&gt;%c4Name%&lt;/b&gt;&lt;/font&gt;&lt;div&gt;[%c4Type%: %c4Technology%]&lt;/div&gt;&lt;br&gt;&lt;div&gt;&lt;font style=&quot;font-size: 11px&quot;&gt;%c4Description%&lt;/font&gt;&lt;/div&gt;" id="vz4cJAhe5jB_btSd84LD-22">
           <mxCell parent="1" style="rounded=1;whiteSpace=wrap;html=1;labelBackgroundColor=none;fillColor=#63BEF2;fontColor=#ffffff;align=center;arcSize=6;strokeColor=#2086C9;metaEdit=1;resizable=0;points=[[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0.25,0],[1,0.5,0],[1,0.75,0],[0.75,1,0],[0.5,1,0],[0.25,1,0],[0,0.75,0],[0,0.5,0],[0,0.25,0]];" vertex="1">
             <mxGeometry height="120" width="240" x="370" y="2370" as="geometry" />
           </mxCell>
