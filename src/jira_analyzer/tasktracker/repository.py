@@ -33,12 +33,18 @@ class JiraTasksRepository(TasksRepository):
         self.client = JiraTaskClient(config)
 
     def get_task(self, task_id: str) -> Dict[str, Any]:
-        issue = self.client.get_issue(task_id)
-        return jira_issue_to_analysis_input(issue)
+        try:
+            issue = self.client.get_issue(task_id)
+            return jira_issue_to_analysis_input(issue)
+        except Exception as e:
+            raise ValueError(f"Failed to fetch Jira issue {task_id}: {str(e)}")
 
     def search_tasks(self, jql: str, max_results: int = 50) -> List[Dict[str, Any]]:
-        issues = self.client.search_issues(jql, max_results=max_results)
-        return [jira_issue_to_analysis_input(issue) for issue in issues]
+        try:
+            issues = self.client.search_issues(jql, max_results=max_results)
+            return [jira_issue_to_analysis_input(issue) for issue in issues]
+        except Exception as e:
+            raise ValueError(f"Failed to search Jira issues with JQL '{jql}': {str(e)}")
 
     def load_dataset(self, path: str) -> List[Dict[str, Any]]:
         raise NotImplementedError(
@@ -58,5 +64,8 @@ class JsonFileTasksRepository(TasksRepository):
         )
 
     def load_dataset(self, path: str) -> List[Dict[str, Any]]:
-        file_path = Path(path)
-        return load_issues(str(file_path))
+        try:
+            file_path = Path(path)
+            return load_issues(str(file_path))
+        except Exception as e:
+            raise ValueError(f"Failed to load dataset from {path}: {str(e)}")

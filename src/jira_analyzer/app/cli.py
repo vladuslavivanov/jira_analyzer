@@ -82,6 +82,18 @@ def setup_arg_parser() -> argparse.ArgumentParser:
         default=1,
         help="Number of parallel analysis workers (minimum: 1).",
     )
+    parser.add_argument(
+        "--exclude-closed",
+        action="store_true",
+        default=True,
+        help="Exclude closed tasks from analysis (default: True).",
+    )
+    parser.add_argument(
+        "--include-closed",
+        action="store_false",
+        dest="exclude_closed",
+        help="Include closed tasks in analysis.",
+    )
     return parser
 
 
@@ -109,9 +121,12 @@ def load_issues_from_args(args: argparse.Namespace) -> list[dict]:
         return [
             jira_issue_to_analysis_input(issue)
             for issue in search_issues(args.jql, config)
+            if not args.exclude_closed or not _is_closed_status(jira_issue_to_analysis_input(issue))
         ]
 
     jira_issue = fetch_issue(args.jira_issue, config)
+    if _is_closed_status(jira_issue_to_analysis_input(jira_issue)) and args.exclude_closed:
+        raise ValueError(f"Jira issue {args.jira_issue} is closed and excluded from analysis.")
     return [jira_issue_to_analysis_input(jira_issue)]
 
 def main(argv: Optional[List[str]] = None) -> int:

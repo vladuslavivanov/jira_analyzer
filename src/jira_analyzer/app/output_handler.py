@@ -1,4 +1,5 @@
 import json
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Dict, List
 
@@ -72,6 +73,17 @@ def build_markdown_report(results: List[Dict[str, Any]]) -> str:
 
     lines.extend(["", "## Details", ""])
 
+    zombie_tasks = [result for result in results if _is_zombie_task(result)]
+    if zombie_tasks:
+        lines.extend(["", "## Zombie Tasks", ""])
+        lines.append(f"Found {len(zombie_tasks)} tasks not updated for 30+ days:")
+        for result in zombie_tasks:
+            issue_key = result.get("jira_key") or result.get("key") or "Unknown"
+            lines.append(f"- {issue_key}")
+        lines.append("")
+
+    lines.extend(["", "## Issue Details", ""])
+
     for index, result in enumerate(results, start=1):
         issue_key = result.get("jira_key") or result.get("key") or f"Issue {index}"
         issue_type = result.get("input_element_type", "N/A")
@@ -82,6 +94,14 @@ def build_markdown_report(results: List[Dict[str, Any]]) -> str:
                 f"- Type: {issue_type}",
             ]
         )
+        status = result.get("status", "")
+        if status:
+            lines.append(f"- Status: {status}")
+        updated_at = result.get("updated_at", "")
+        if updated_at:
+            lines.append(f"- Updated: {updated_at}")
+            if _is_zombie_task(result):
+                lines.append("- **Zombie Task**: Not updated for 30+ days")
         if "overall_score" in result:
             lines.append(f"- Score: {result['overall_score']}")
         if "verdict" in result:
@@ -180,3 +200,15 @@ def _markdown_table_row(values: List[Any]) -> str:
 
 def _escape_table_cell(value: Any) -> str:
     return str(value).replace("|", "\\|").replace("\n", " ")
+
+
+def _is_zombie_task(result: Dict[str, Any], days_threshold: int = 30) -> bool:
+    updated_at_str = result.get("updated_at")
+    if not updated_at_str:
+        return False
+    try:
+        updated_at = datetime.fromisoformat(updated_at_str.replace('Z', '+00:00'))
+        now = datetime.now(timezone.utc)
+        return (now - updated_at) > timedelta(days=days_threshold)
+    except (ValueError, TypeError):
+        return False

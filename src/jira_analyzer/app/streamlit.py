@@ -113,6 +113,8 @@ TRANSLATIONS = {
         "overall_conclusion": "Overall Conclusion",
         "recommendations": "Recommendations",
         "no_recommendations": "No recommendations available",
+        "exclude_closed": "Exclude closed tasks",
+        "include_closed_tasks": "Include closed tasks",
     },
     "ru": {
         "language": "Язык",
@@ -193,6 +195,8 @@ TRANSLATIONS = {
         "overall_conclusion": "Общий вывод",
         "recommendations": "Рекомендации",
         "no_recommendations": "Рекомендации отсутствуют",
+        "exclude_closed": "Исключить закрытые задачи",
+        "include_closed_tasks": "Включить закрытые задачи",
     },
 }
 
@@ -443,6 +447,7 @@ def main() -> None:
     jira_verify_ssl = True
     jira_query_mode = "Issue key"
     jira_max_results = 50
+    exclude_closed = True
 
     if source == "Jira":
         with st.sidebar.expander(t("connection"), expanded=False):
@@ -476,6 +481,11 @@ def main() -> None:
                 value=50,
                 step=1,
             )
+        
+        exclude_closed = st.sidebar.checkbox(
+            t("exclude_closed"),
+            value=True,
+        )
     else:
         uploaded_file = st.sidebar.file_uploader(t("upload_jira_json"), type=["json"])
         use_sample = st.sidebar.checkbox(
@@ -499,6 +509,7 @@ def main() -> None:
                 jira_token=jira_token,
                 jira_verify_ssl=jira_verify_ssl,
                 jira_max_results=int(jira_max_results),
+                exclude_closed=exclude_closed,
             )
             if not issues:
                 st.warning(t("no_issues"))
@@ -760,6 +771,7 @@ def _load_issues(
     jira_token: str,
     jira_verify_ssl: bool,
     jira_max_results: int,
+    exclude_closed: bool = True,
 ) -> list[dict]:
     if source == "JSON":
         return _load_json_issues(uploaded_file, use_sample, t)
@@ -778,7 +790,7 @@ def _load_issues(
         if not jira_jql.strip():
             raise ValueError(t("jql_required"))
         with st.spinner(t("fetching_jql")):
-            return [
+            issues = [
                 jira_issue_to_analysis_input(issue)
                 for issue in search_issues(
                     jira_jql,
@@ -786,11 +798,17 @@ def _load_issues(
                     max_results=jira_max_results,
                 )
             ]
+            if exclude_closed:
+                issues = [issue for issue in issues if not _is_closed_status_streamlit(issue)]
+            return issues
 
     if not jira_issue:
         raise ValueError(t("jira_issue_required"))
     with st.spinner(t("fetching_issue", issue=jira_issue)):
-        return [jira_issue_to_analysis_input(fetch_issue(jira_issue, config))]
+        issue = jira_issue_to_analysis_input(fetch_issue(jira_issue, config))
+        if exclude_closed and _is_closed_status_streamlit(issue):
+            raise ValueError(f"Issue {jira_issue} is closed and excluded from analysis.")
+        return [issue]
 
 
 def _load_json_issues(uploaded_file, use_sample: bool, t) -> list[dict]:
@@ -847,6 +865,12 @@ def _build_results_table(results: list[dict]) -> pd.DataFrame:
         rows.append(row)
 
     return pd.DataFrame(rows)
+
+
+def _is_closed_status_streamlit(issue: dict) -> bool:
+    status = issue.get("status", "").lower()
+    closed_statuses = {"closed", "done", "resolved", "cancelled"}
+    return status in closed_statuses
 
 
 def _render_results(results: list[dict], t) -> None:

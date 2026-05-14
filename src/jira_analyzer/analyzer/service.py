@@ -1,9 +1,25 @@
-from __future__ import annotations
-
 import json
+from datetime import datetime, timedelta, timezone
 from queue import Empty, Queue
 from threading import Lock, Thread
 from typing import Any, Dict, List
+
+from jira_analyzer.analyzer.core.llm.client import LLMClient
+from jira_analyzer.analyzer.core.llm.prompt_builder import (
+    AnalysisPromptConfig,
+    build_prompt_from_template,
+    build_structured_prompt,
+    get_default_prompt_config,
+)
+from jira_analyzer.analyzer.core.llm.provider import LLMProvider
+from jira_analyzer.app.output_handler import build_markdown_report
+from jira_analyzer.tasktracker.jira import JiraConnectionConfig
+from jira_analyzer.tasktracker.repository import (
+    JiraTasksRepository,
+    JsonFileTasksRepository,
+    TasksRepository,
+)
+from jira_analyzer.utils.logger import setup_logger
 
 from jira_analyzer.analyzer.core.llm.client import LLMClient
 from jira_analyzer.analyzer.core.llm.prompt_builder import (
@@ -73,15 +89,44 @@ class AnalysisService:
         jql: str,
         jira_config: JiraConnectionConfig | None = None,
         max_results: int = 50,
+        exclude_closed: bool = True,
     ) -> List[Dict[str, Any]]:
-        repository = self._resolve_task_repository(jira_config=jira_config)
-        issues = repository.search_tasks(jql=jql, max_results=max_results)
-        return self.analyze_issues(issues)
+        try:
+            repository = self._resolve_task_repository(jira_config=jira_config)
+            issues = repository.search_tasks(jql=jql, max_results=max_results)
+            if exclude_closed:
+                issues = [issue for issue in issues if not self._is_closed_status(issue)]
+            return self.analyze_issues(issues)
+        except ValueError as e:
+            return [{"error": str(e)}]
+        except Exception as e:
+            return [{"error": f"Unexpected error during JQL analysis: {str(e)}"}]
+
+    def _is_closed_status(self, issue: Dict[str, Any]) -> bool:
+        status = issue.get("status", "").lower()
+        closed_statuses = {"closed", "done", "resolved", "cancelled"}
+        return status in closed_statuses
+
+    def is_zombie_task(self, issue: Dict[str, Any], days_threshold: int = 30) -> bool:
+        updated_at_str = issue.get("updated_at")
+        if not updated_at_str:
+            return False
+        try:
+            updated_at = datetime.fromisoformat(updated_at_str.replace('Z', '+00:00'))
+            now = datetime.now(timezone.utc)
+            return (now - updated_at) > timedelta(days=days_threshold)
+        except (ValueError, TypeError):
+            return False
 
     def analyze_dataset(self, path: str) -> List[Dict[str, Any]]:
-        repository = self._resolve_task_repository()
-        issues = repository.load_dataset(path)
-        return self.analyze_issues(issues)
+        try:
+            repository = self._resolve_task_repository()
+            issues = repository.load_dataset(path)
+            return self.analyze_issues(issues)
+        except ValueError as e:
+            return [{"error": str(e)}]
+        except Exception as e:
+            return [{"error": f"Unexpected error during dataset analysis: {str(e)}"}]
 
     def generate_report(self, results: List[Dict[str, Any]], format: str = "json") -> str:
         if format == "markdown":
@@ -211,6 +256,8 @@ class AnalysisService:
                 prompt_result["jira_key"] = issue["jira_key"]
             prompt_result["input_element_type"] = element_type
             prompt_result["input_description"] = description
+            prompt_result["status"] = issue.get("status", "")
+            prompt_result["updated_at"] = issue.get("updated_at", "")
             return prompt_result
         except Exception as error:
             logger.error(f"Failed to attach metadata to the result for issue {idx}: {error}")
@@ -220,6 +267,8 @@ class AnalysisService:
                 "jira_key": issue.get("jira_key"),
                 "input_element_type": element_type,
                 "input_description": description,
+                "status": issue.get("status", ""),
+                "updated_at": issue.get("updated_at", ""),
             }
 
     def _analyze_issue_criteria_split(
