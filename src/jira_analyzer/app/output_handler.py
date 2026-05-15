@@ -142,32 +142,21 @@ def build_markdown_report(results: List[Dict[str, Any]]) -> str:
 
     # Criteria Statistics Table
     if all_criteria_keys:
-        lines.extend(["", "## Criteria Statistics", "",])
-        lines.append(_markdown_table_row(["Criterion", "Average Score", "Scoring System"]))
-        lines.append(_markdown_table_row(["---", "---", "---"]))
-        for key, count in zip(all_criteria_keys, score_counts):
+        lines.extend(["", "## Evaluation Criteria", ""])
+        lines.append(_markdown_table_row(["Name", "Scoring", "Average", "Description"]))
+        lines.append(_markdown_table_row(["---", "---", "---", "---"]))
+        for key in all_criteria_keys:
+            count = score_counts[all_criteria_keys.index(key)]
             if count > 0:
                 avg = total_scores[all_criteria_keys.index(key)] / count
-                scoring = criteria_info.get(key, {}).get("scoring_system", "")
-                title = criteria_info.get(key, {}).get("title", key.replace("_", " ").title())
-                lines.append(_markdown_table_row([title, f"{avg:.2f}", scoring]))
-        lines.append("")
-
-    if criteria_info:
-        lines.extend(["", "## Evaluation Criteria", ""])
-        lines.append(_markdown_table_row(["Criterion", "Scoring", "Description"]))
-        lines.append(_markdown_table_row(["---", "---", "---"]))
-        for key in all_criteria_keys:
+                avg_str = f"{avg:.2f}"
+            else:
+                avg_str = ""
             info = criteria_info.get(key, {})
-            lines.append(
-                _markdown_table_row(
-                    [
-                        info.get("title", key.replace("_", " ").title()),
-                        info.get("scoring_system", ""),
-                        info.get("description", ""),
-                    ]
-                )
-            )
+            name = info.get("title", key.replace("_", " ").title())
+            scoring = info.get("scoring_system", "")
+            description = info.get("description", "")
+            lines.append(_markdown_table_row([name, scoring, avg_str, description]))
         lines.append("")
 
     zombie_tasks = [result for result in results if _is_zombie_task(result)]
