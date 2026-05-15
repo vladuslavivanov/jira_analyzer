@@ -216,7 +216,7 @@ def build_markdown_report(results: List[Dict[str, Any]]) -> str:
                 review = criterion_result.get("review", "")
                 recs = criterion_result.get("recommendations", [])
                 if isinstance(recs, list):
-                    recommendation = " ".join([f"{r.strip()}" for r in recs if r.strip()])
+                    recommendation = "  ".join([f"{i+1}. {r.strip()}" for i, r in enumerate(recs) if r.strip()])
                 else:
                     recommendation = str(recs) if recs else ""
                 lines.append(
