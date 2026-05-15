@@ -2,19 +2,19 @@ from __future__ import annotations
 
 import json
 import sqlite3
-from datetime import datetime, timezone, timedelta
-
-UTC_PLUS_3 = timezone(timedelta(hours=3))
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from jira_analyzer.storage.repository import AnalysisResultRepository
 
+UTC_PLUS_3 = timezone(timedelta(hours=3))
+
 
 class SqliteAnalysisResultRepository(AnalysisResultRepository):
     """SQLite-backed repository for analysis results."""
 
-    STATES = {'PENDING', 'PROCESSING', 'COMPLETED', 'FAILED'}
+    STATES = {"PENDING", "PROCESSING", "COMPLETED", "FAILED"}
 
     def __init__(self, database_path: str | Path) -> None:
         self.database_path = Path(database_path)
@@ -55,12 +55,12 @@ class SqliteAnalysisResultRepository(AnalysisResultRepository):
                 """,
                 (
                     task_id,
-                    task_data.get('title'),
-                    task_data.get('description'),
-                    task_data.get('status'),
-                    task_data.get('assignee'),
-                    task_data.get('created_at'),
-                    task_data.get('updated_at'),
+                    task_data.get("title"),
+                    task_data.get("description"),
+                    task_data.get("status"),
+                    task_data.get("assignee"),
+                    task_data.get("created_at"),
+                    task_data.get("updated_at"),
                 ),
             )
             conn.commit()
@@ -81,19 +81,23 @@ class SqliteAnalysisResultRepository(AnalysisResultRepository):
 
         # Compute total_score as average of criteria_scores if available
         total_score = None
-        criteria_scores = result.get('criteria_scores', {})
+        criteria_scores = result.get("criteria_scores", {})
         if criteria_scores:
-            scores = [float(v) for v in criteria_scores.values() if isinstance(v, (int, float))]
+            scores = [
+                float(v)
+                for v in criteria_scores.values()
+                if isinstance(v, (int, float))
+            ]
             if scores:
                 total_score = sum(scores) / len(scores)
 
         # Use overall_conclusion as summary for now
-        summary = result.get('overall_conclusion', '')
+        summary = result.get("overall_conclusion", "")
         if not isinstance(summary, str):
             summary = json.dumps(summary)
 
         # Handle recommendations as list or string
-        recommendations = result.get('recommendations', [])
+        recommendations = result.get("recommendations", [])
         if not isinstance(recommendations, str):
             recommendations = json.dumps(recommendations)
 
@@ -118,7 +122,7 @@ class SqliteAnalysisResultRepository(AnalysisResultRepository):
     def save_failed(self, task_id: str, error: str) -> None:
         """Save a failed analysis for a task."""
         now = datetime.now(timezone(timedelta(hours=3))).isoformat()
-        error_data = json.dumps({'error': error}, ensure_ascii=False)
+        error_data = json.dumps({"error": error}, ensure_ascii=False)
         with sqlite3.connect(self.database_path) as conn:
             conn.execute(
                 """
@@ -155,23 +159,31 @@ class SqliteAnalysisResultRepository(AnalysisResultRepository):
 
             columns = [description[0] for description in cursor.description]
             data = dict(zip(columns, row))
-            if data.get('raw_response'):
-                data['analysis'] = json.loads(data['raw_response'])
-                del data['raw_response']
+            if data.get("raw_response"):
+                data["analysis"] = json.loads(data["raw_response"])
+                del data["raw_response"]
 
             # Parse JSON fields if they are serialized
-            if data.get('summary') and isinstance(data['summary'], str) and data['summary'].startswith(('{', '[')):
+            if (
+                data.get("summary")
+                and isinstance(data["summary"], str)
+                and data["summary"].startswith(("{", "["))
+            ):
                 try:
-                    data['summary'] = json.loads(data['summary'])
+                    data["summary"] = json.loads(data["summary"])
                 except json.JSONDecodeError:
                     pass
-            if data.get('recommendations') and isinstance(data['recommendations'], str) and data['recommendations'].startswith(('{', '[')):
+            if (
+                data.get("recommendations")
+                and isinstance(data["recommendations"], str)
+                and data["recommendations"].startswith(("{", "["))
+            ):
                 try:
-                    data['recommendations'] = json.loads(data['recommendations'])
+                    data["recommendations"] = json.loads(data["recommendations"])
                 except json.JSONDecodeError:
                     pass
 
-            data['task_id'] = task_id
+            data["task_id"] = task_id
             return data
 
     def get_all_results(self) -> List[Dict[str, Any]]:
@@ -185,58 +197,74 @@ class SqliteAnalysisResultRepository(AnalysisResultRepository):
             for row in rows:
                 columns = [desc[0] for desc in cursor.description]
                 data = dict(zip(columns, row))
-                if data.get('raw_response'):
-                    data['analysis'] = json.loads(data['raw_response'])
-                    del data['raw_response']
+                if data.get("raw_response"):
+                    data["analysis"] = json.loads(data["raw_response"])
+                    del data["raw_response"]
 
                 # Parse JSON fields if they are serialized
-                if data.get('summary') and isinstance(data['summary'], str) and data['summary'].startswith(('{', '[')):
+                if (
+                    data.get("summary")
+                    and isinstance(data["summary"], str)
+                    and data["summary"].startswith(("{", "["))
+                ):
                     try:
-                        data['summary'] = json.loads(data['summary'])
+                        data["summary"] = json.loads(data["summary"])
                     except json.JSONDecodeError:
                         pass
-                if data.get('recommendations') and isinstance(data['recommendations'], str) and data['recommendations'].startswith(('{', '[')):
+                if (
+                    data.get("recommendations")
+                    and isinstance(data["recommendations"], str)
+                    and data["recommendations"].startswith(("{", "["))
+                ):
                     try:
-                        data['recommendations'] = json.loads(data['recommendations'])
+                        data["recommendations"] = json.loads(data["recommendations"])
                     except json.JSONDecodeError:
                         pass
 
-                data['task_id'] = data['task_id']
+                data["task_id"] = data["task_id"]
                 results.append(data)
             return results
 
     # Legacy batch methods adapted to new schema
-    def save_results(self, results: List[Dict[str, Any]], run_name: str | None = None) -> int:
+    def save_results(
+        self, results: List[Dict[str, Any]], run_name: str | None = None
+    ) -> int:
         """Save a list of analysis results (legacy)."""
         now = datetime.now(timezone(timedelta(hours=3))).isoformat()
         with sqlite3.connect(self.database_path) as conn:
             for res in results:
-                task_id = res.get('key') or res.get('jira_key')
+                task_id = res.get("key") or res.get("jira_key")
                 if not task_id:
                     continue
 
                 # Extract fields
-                title = res.get('title', res.get('summary', ''))
-                description = res.get('description', res.get('input_description', ''))
-                status = res.get('status', '')
-                assignee = res.get('assignee', '')
-                created_at = res.get('created_at', '')
-                updated_at = res.get('updated_at', now)
+                title = res.get("title", res.get("summary", ""))
+                description = res.get("description", res.get("input_description", ""))
+                status = res.get("status", "")
+                assignee = res.get("assignee", "")
+                created_at = res.get("created_at", "")
+                updated_at = res.get("updated_at", now)
 
                 # Compute total_score
-                criteria_scores = res.get('criteria_scores', {})
+                criteria_scores = res.get("criteria_scores", {})
                 if not criteria_scores:
                     # Legacy, extract from criteria
-                    criteria = res.get('criteria', {})
-                    criteria_scores = {k: c['score'] for k, c in criteria.items() if 'score' in c}
-                scores = [float(v) for v in criteria_scores.values() if isinstance(v, (int, float))]
+                    criteria = res.get("criteria", {})
+                    criteria_scores = {
+                        k: c["score"] for k, c in criteria.items() if "score" in c
+                    }
+                scores = [
+                    float(v)
+                    for v in criteria_scores.values()
+                    if isinstance(v, (int, float))
+                ]
                 total_score = sum(scores) / len(scores) if scores else None
 
-                summary = res.get('overall_conclusion', res.get('summary', ''))
+                summary = res.get("overall_conclusion", res.get("summary", ""))
                 if not isinstance(summary, str):
                     summary = json.dumps(summary)
 
-                recommendations = res.get('recommendations', [])
+                recommendations = res.get("recommendations", [])
                 if isinstance(recommendations, list):
                     recommendations = json.dumps(recommendations)
                 elif not isinstance(recommendations, str):
@@ -250,7 +278,20 @@ class SqliteAnalysisResultRepository(AnalysisResultRepository):
                     (task_id, title, description, status, assignee, created_at, updated_at, state, total_score, summary, recommendations, raw_response, analyzed_at)
                     VALUES (?, ?, ?, ?, ?, ?, ?, 'COMPLETED', ?, ?, ?, ?, ?)
                     """,
-                    (task_id, title, description, status, assignee, created_at, updated_at, total_score, summary, recommendations, raw_response, now),
+                    (
+                        task_id,
+                        title,
+                        description,
+                        status,
+                        assignee,
+                        created_at,
+                        updated_at,
+                        total_score,
+                        summary,
+                        recommendations,
+                        raw_response,
+                        now,
+                    ),
                 )
             conn.commit()
         return 1  # Dummy
@@ -258,12 +299,12 @@ class SqliteAnalysisResultRepository(AnalysisResultRepository):
     def get_results(self, run_id: int) -> List[Dict[str, Any]]:
         """Retrieve analysis results (legacy, ignores run_id)."""
         full = self.get_all_results()
-        return [r['analysis'] for r in full]
+        return [r["analysis"] for r in full]
 
     def get_latest_results(self) -> List[Dict[str, Any]]:
         """Retrieve the most recent analysis results (legacy)."""
         all_results = self.get_all_results()
         if all_results:
-            all_results.sort(key=lambda x: x.get('analyzed_at', ''), reverse=True)
-            return [r['analysis'] for r in all_results[:50]]
+            all_results.sort(key=lambda x: x.get("analyzed_at", ""), reverse=True)
+            return [r["analysis"] for r in all_results[:50]]
         return []
