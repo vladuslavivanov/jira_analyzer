@@ -7,3 +7,7 @@
     - [x] place statistics of criteria score in separate table
 - [x] Update report section in UI according to UI requirements in end of spec. Only folder with markdown-report and output JSON must remain. 
 - [x] Use asyncronous requests to LLM processing, not multithreading (see streamlit warnings on start up)
+
+- [ ] fix mock jira to return all data on any request
+- [ ] change default dataset in jira mock
+- [ ] page for ready analysis viewing: master-detail view where list of tasks and details for one
