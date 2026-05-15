@@ -891,18 +891,9 @@ def _is_closed_status_streamlit(issue: dict) -> bool:
 def _render_results(results: list[dict], t) -> None:
     markdown_report = build_markdown_report(results)
 
-    json_tab, report_tab = st.tabs(
-        ["JSON", t("markdown_report")]
+    report_tab, json_tab = st.tabs(
+        [t("markdown_report"), "JSON", ]
     )
-
-    with json_tab:
-        st.json(results)
-        st.download_button(
-            t("download_json"),
-            data=json.dumps(results, ensure_ascii=False, indent=2),
-            file_name="analysis_result.json",
-            mime="application/json",
-        )
 
     with report_tab:
         st.markdown(markdown_report)
@@ -912,6 +903,16 @@ def _render_results(results: list[dict], t) -> None:
             file_name="analysis_report.md",
             mime="text/markdown",
         )
+        
+    with json_tab:
+        st.json(results)
+        st.download_button(
+            t("download_json"),
+            data=json.dumps(results, ensure_ascii=False, indent=2),
+            file_name="analysis_result.json",
+            mime="application/json",
+        )
+
 
     st.divider()
 
