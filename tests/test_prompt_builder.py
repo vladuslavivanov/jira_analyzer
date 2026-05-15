@@ -230,6 +230,7 @@ def test_structured_prompt_contains_parseable_schema_for_mixed_criteria():
         "description": "Check yes or no.",
         "scoring_system": "binary",
         "score": 0,
+        "recommendations": {"type": "array", "items": {"type": "string"}, "description": "1-3 specific recommendations for this criterion based on the score"}
     }
     assert schema["criteria"]["percent_criterion"]["review"]
     assert schema["criteria"]["five_criterion"]["scoring_system"] == "five"

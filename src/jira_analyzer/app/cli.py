@@ -24,6 +24,12 @@ DEFAULT_OUTPUT_FILE = DEFAULT_DATA_DIR / "output.json"
 
 logger = setup_logger(__name__)
 
+def _is_closed_status(issue: dict) -> bool:
+    status = issue.get("status", "").lower()
+    closed_statuses = {"closed", "done", "resolved", "cancelled"}
+    return status in closed_statuses
+
+
 def setup_arg_parser() -> argparse.ArgumentParser:
     """
     Configures the command-line argument parser.
@@ -43,7 +49,7 @@ def setup_arg_parser() -> argparse.ArgumentParser:
         "-o",
         type=Path,
         default=DEFAULT_OUTPUT_FILE,
-        help="Path to output JSON file (default: data/output.json)",
+        help="Path to output JSON file or SQLite DB (default: data/output.json)",
     )
     parser.add_argument(
         "--jira-issue",
@@ -82,6 +88,23 @@ def setup_arg_parser() -> argparse.ArgumentParser:
         default=1,
         help="Number of parallel analysis workers (minimum: 1).",
     )
+    parser.add_argument(
+        "--exclude-closed",
+        action="store_true",
+        default=True,
+        help="Exclude closed tasks from analysis (default: True).",
+    )
+    parser.add_argument(
+        "--include-closed",
+        action="store_false",
+        dest="exclude_closed",
+        help="Include closed tasks in analysis.",
+    )
+    parser.add_argument(
+        "--split-by-criterion",
+        action="store_true",
+        help="Analyze each criterion separately in individual LLM requests (slower but more detailed).",
+    )
     return parser
 
 
@@ -109,9 +132,12 @@ def load_issues_from_args(args: argparse.Namespace) -> list[dict]:
         return [
             jira_issue_to_analysis_input(issue)
             for issue in search_issues(args.jql, config)
+            if not args.exclude_closed or not _is_closed_status(jira_issue_to_analysis_input(issue))
         ]
 
     jira_issue = fetch_issue(args.jira_issue, config)
+    if _is_closed_status(jira_issue_to_analysis_input(jira_issue)) and args.exclude_closed:
+        raise ValueError(f"Jira issue {args.jira_issue} is closed and excluded from analysis.")
     return [jira_issue_to_analysis_input(jira_issue)]
 
 def main(argv: Optional[List[str]] = None) -> int:
@@ -132,7 +158,11 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     # 2. Run Analysis
     try:
-        results = run_analysis(issues, worker_count=max(1, args.workers))
+        results = run_analysis(
+            issues, 
+            worker_count=max(1, args.workers),
+            split_by_criterion=getattr(args, 'split_by_criterion', False)
+        )
     except Exception as e:
         logger.error(f"Analysis failed: {e}")
         return 1

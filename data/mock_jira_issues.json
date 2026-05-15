@@ -1,12 +1,12 @@
 [
   {
     "key": "YA-1",
-    "element type": "Risk",
+    "element_type": "Risk",
     "description": "Риск: появление новых любых зависимостей у [название_команды] в процессе разработки модели"
   },
   {
     "key": "YA-2",
-    "element type": "Risk",
+    "element_type": "Risk",
     "description": "Риск: на этапе сборки топа могут появиться несовместимости"
   }
 ]

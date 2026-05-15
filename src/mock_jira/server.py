@@ -36,7 +36,7 @@ def normalize_issue(issue: dict[str, Any]) -> dict[str, Any]:
         return issue
 
     issue_key = issue["key"]
-    element_type = issue.get("element type", "Task")
+    element_type = issue.get("element_type", "Task")
     description = issue.get("description", "")
     project_key = issue_key.split("-", maxsplit=1)[0]
 
@@ -45,7 +45,7 @@ def normalize_issue(issue: dict[str, Any]) -> dict[str, Any]:
         "id": issue.get("id", issue_key.replace("-", "")),
         "self": f"http://127.0.0.1:8081/rest/api/2/issue/{issue_key}",
         "key": issue_key,
-        "element type": element_type,
+        "element_type": element_type,
         "description": description,
         "fields": {
             "summary": description,

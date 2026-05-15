@@ -13,6 +13,7 @@ from jira_analyzer.analyzer.engine import (
     run_analysis,
 )
 from jira_analyzer.app.output_handler import build_markdown_report
+from jira_analyzer.storage import SqliteAnalysisResultRepository
 from jira_analyzer.tasktracker.jira import (
     JiraConnectionConfig,
     fetch_issue,
@@ -113,6 +114,10 @@ TRANSLATIONS = {
         "overall_conclusion": "Overall Conclusion",
         "recommendations": "Recommendations",
         "no_recommendations": "No recommendations available",
+        "exclude_closed": "Exclude closed tasks",
+        "include_closed_tasks": "Include closed tasks",
+        "split_by_criterion": "Analyze each criterion separately",
+        "split_by_criterion_help": "When enabled, each criterion is analyzed in a separate LLM request. This provides more detailed analysis but takes longer.",
     },
     "ru": {
         "language": "Язык",
@@ -193,6 +198,10 @@ TRANSLATIONS = {
         "overall_conclusion": "Общий вывод",
         "recommendations": "Рекомендации",
         "no_recommendations": "Рекомендации отсутствуют",
+        "exclude_closed": "Исключить закрытые задачи",
+        "include_closed_tasks": "Включить закрытые задачи",
+        "split_by_criterion": "Анализировать каждый критерий отдельно",
+        "split_by_criterion_help": "При включении каждый критерий анализируется в отдельном запросе к ИИ. Это обеспечивает более детальный анализ, но занимает больше времени.",
     },
 }
 
@@ -428,6 +437,11 @@ def main() -> None:
         value=1,
         step=1,
     )
+    split_by_criterion = st.sidebar.checkbox(
+        t("split_by_criterion"),
+        value=False,
+        help=t("split_by_criterion_help"),
+    )
 
     _ensure_prompt_state()
     _render_prompt_config_io(t)
@@ -443,6 +457,7 @@ def main() -> None:
     jira_verify_ssl = True
     jira_query_mode = "Issue key"
     jira_max_results = 50
+    exclude_closed = True
 
     if source == "Jira":
         with st.sidebar.expander(t("connection"), expanded=False):
@@ -476,12 +491,19 @@ def main() -> None:
                 value=50,
                 step=1,
             )
+        
+        exclude_closed = st.sidebar.checkbox(
+            t("exclude_closed"),
+            value=True,
+        )
     else:
         uploaded_file = st.sidebar.file_uploader(t("upload_jira_json"), type=["json"])
         use_sample = st.sidebar.checkbox(
             t("use_sample"),
             value=not uploaded_file,
         )
+
+    db_path = st.sidebar.text_input("Database Path", value="data/analysis.db", help="Path to SQLite database for intermediate results")
 
     if st.button(t("run_analysis"), type="primary"):
         st.session_state.analysis_results = None
@@ -499,6 +521,7 @@ def main() -> None:
                 jira_token=jira_token,
                 jira_verify_ssl=jira_verify_ssl,
                 jira_max_results=int(jira_max_results),
+                exclude_closed=exclude_closed,
             )
             if not issues:
                 st.warning(t("no_issues"))
@@ -507,10 +530,13 @@ def main() -> None:
             with st.spinner(
                 t("analyzing", count=len(issues), workers=int(worker_count))
             ):
+                repo = SqliteAnalysisResultRepository(db_path)
                 results = run_analysis(
                     issues,
                     prompt_config=prompt_config,
                     worker_count=int(worker_count),
+                    split_by_criterion=split_by_criterion,
+                    repo=repo,
                 )
 
             st.session_state.analysis_results = results
@@ -760,6 +786,7 @@ def _load_issues(
     jira_token: str,
     jira_verify_ssl: bool,
     jira_max_results: int,
+    exclude_closed: bool = True,
 ) -> list[dict]:
     if source == "JSON":
         return _load_json_issues(uploaded_file, use_sample, t)
@@ -778,7 +805,7 @@ def _load_issues(
         if not jira_jql.strip():
             raise ValueError(t("jql_required"))
         with st.spinner(t("fetching_jql")):
-            return [
+            issues = [
                 jira_issue_to_analysis_input(issue)
                 for issue in search_issues(
                     jira_jql,
@@ -786,11 +813,17 @@ def _load_issues(
                     max_results=jira_max_results,
                 )
             ]
+            if exclude_closed:
+                issues = [issue for issue in issues if not _is_closed_status_streamlit(issue)]
+            return issues
 
     if not jira_issue:
         raise ValueError(t("jira_issue_required"))
     with st.spinner(t("fetching_issue", issue=jira_issue)):
-        return [jira_issue_to_analysis_input(fetch_issue(jira_issue, config))]
+        issue = jira_issue_to_analysis_input(fetch_issue(jira_issue, config))
+        if exclude_closed and _is_closed_status_streamlit(issue):
+            raise ValueError(f"Issue {jira_issue} is closed and excluded from analysis.")
+        return [issue]
 
 
 def _load_json_issues(uploaded_file, use_sample: bool, t) -> list[dict]:
@@ -801,7 +834,7 @@ def _load_json_issues(uploaded_file, use_sample: bool, t) -> list[dict]:
         return data
 
     if use_sample:
-        project_root = Path(__file__).resolve().parents[2]
+        project_root = Path(__file__).resolve().parents[3]
         sample_path = project_root / "data" / "input.json"
         if not sample_path.exists():
             raise FileNotFoundError(t("sample_not_found", path=sample_path))
@@ -849,23 +882,18 @@ def _build_results_table(results: list[dict]) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
+def _is_closed_status_streamlit(issue: dict) -> bool:
+    status = issue.get("status", "").lower()
+    closed_statuses = {"closed", "done", "resolved", "cancelled"}
+    return status in closed_statuses
+
+
 def _render_results(results: list[dict], t) -> None:
-    df = pd.DataFrame(results)
-    table_df = _build_results_table(results)
     markdown_report = build_markdown_report(results)
 
-    json_tab, report_tab, table_tab, details_tab = st.tabs(
-        ["JSON", t("markdown_report"), t("table"), t("details")]
+    report_tab, json_tab = st.tabs(
+        [t("markdown_report"), "JSON", ]
     )
-
-    with json_tab:
-        st.json(results)
-        st.download_button(
-            t("download_json"),
-            data=json.dumps(results, ensure_ascii=False, indent=2),
-            file_name="analysis_result.json",
-            mime="application/json",
-        )
 
     with report_tab:
         st.markdown(markdown_report)
@@ -875,79 +903,18 @@ def _render_results(results: list[dict], t) -> None:
             file_name="analysis_report.md",
             mime="text/markdown",
         )
+        
+    with json_tab:
+        st.json(results)
+        st.download_button(
+            t("download_json"),
+            data=json.dumps(results, ensure_ascii=False, indent=2),
+            file_name="analysis_result.json",
+            mime="application/json",
+        )
 
-    with table_tab:
-        st.dataframe(table_df if not table_df.empty else df, width="stretch")
 
-    with details_tab:
-        for index, result in enumerate(results, start=1):
-            header_name = (
-                result.get("jira_key")
-                or result.get("key")
-                or result.get("input_element_type")
-                or "Unknown"
-            )
-            st.subheader(t("issue", number=index, name=header_name))
-
-            if "error" in result:
-                st.error(t("failed_issue", error=result["error"]))
-                st.write(t("original_description"))
-                st.info(result.get("input_description", t("no_description")))
-                st.divider()
-                continue
-
-            col1, col2 = st.columns([1, 3])
-            with col1:
-                if "overall_score" in result:
-                    st.metric(t("overall_score"), result["overall_score"])
-                if "verdict" in result:
-                    st.write(f"{t('verdict')}: {result['verdict']}")
-
-                scores = _extract_criterion_scores(result)
-                if scores:
-                    st.write(t("criteria_breakdown"))
-                    for score_index, value in enumerate(scores, start=1):
-                        st.write(f"- К{score_index}: {value}")
-
-            with col2:
-                st.write(t("original_description"))
-                st.info(result.get("input_description", t("no_description")))
-
-                st.write(t("diagnosis"))
-                st.write(result.get("diagnosis", t("no_diagnosis")))
-
-                criteria = result.get("criteria", {})
-                if isinstance(criteria, dict) and criteria:
-                    st.write(t("criteria_reviews"))
-                    for key, criterion_result in criteria.items():
-                        if not isinstance(criterion_result, dict):
-                            continue
-                        title = criterion_result.get(
-                            "title",
-                            key.replace("_", " ").title(),
-                        )
-                        score = criterion_result.get("score", "N/A")
-                        scoring_system = criterion_result.get(
-                            "scoring_system",
-                            "N/A",
-                        )
-                        st.markdown(f"**{title}**: {score} ({scoring_system})")
-                        if criterion_result.get("review"):
-                            st.write(criterion_result["review"])
-
-                if result.get("overall_conclusion"):
-                    st.write(t("overall_conclusion"))
-                    st.write(result["overall_conclusion"])
-
-                st.write(t("recommendations"))
-                st.markdown(
-                    result.get(
-                        "recommendations",
-                        t("no_recommendations"),
-                    )
-                )
-
-            st.divider()
+    st.divider()
 
 
 if __name__ == "__main__":

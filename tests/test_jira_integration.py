@@ -95,7 +95,7 @@ def test_jira_issue_is_mapped_to_analyzer_input(mock_jira_url, fake_jira_module)
 
     analysis_input = jira_issue_to_analysis_input(client.get_issue("YA-1"))
 
-    assert analysis_input["element type"] == "Risk"
+    assert analysis_input["element_type"] == "Risk"
     assert analysis_input["key"] == "YA-1"
     assert analysis_input["description"].startswith("Риск: появление новых")
     assert "[название_команды]" in analysis_input["description"]
@@ -120,10 +120,10 @@ def test_cli_can_analyze_jira_issue_with_mock(
 
     output_file = Path("data/test_jira_integration_output.json")
 
-    def fake_run_analysis(issues, worker_count=1):
+    def fake_run_analysis(issues, worker_count=1, split_by_criterion=False):
         assert issues[0]["jira_key"] == "YA-1"
         assert worker_count == 1
-        return [{"input_element_type": issues[0]["element type"], "overall_score": 10}]
+        return [{"input_element_type": issues[0]["element_type"], "overall_score": 10}]
 
     monkeypatch.setattr(cli, "run_analysis", fake_run_analysis)
 
@@ -159,13 +159,13 @@ def test_cli_can_analyze_jira_jql_with_mock(
     output_file = Path("data/test_jira_jql_output.json")
     markdown_file = Path("data/test_jira_jql_output.md")
 
-    def fake_run_analysis(issues, worker_count=1):
+    def fake_run_analysis(issues, worker_count=1, split_by_criterion=False):
         assert [issue["jira_key"] for issue in issues] == ["YA-1", "YA-2"]
         assert worker_count == 2
         return [
             {
                 "jira_key": issue["jira_key"],
-                "input_element_type": issue["element type"],
+                "input_element_type": issue["element_type"],
                 "overall_score": "5/5",
                 "verdict": "Accept",
             }

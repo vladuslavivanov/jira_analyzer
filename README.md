@@ -76,7 +76,7 @@ Mock issues live in `data/mock_jira_issues.json`. The default data contains `YA-
 [
   {
     "key": "YA-1",
-    "element type": "Risk",
+    "element_type": "Risk",
     "description": "Risk description"
   }
 ]
