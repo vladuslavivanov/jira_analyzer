@@ -11,3 +11,8 @@
 - [ ] fix mock jira to return all data on any request
 - [ ] change default dataset in jira mock
 - [ ] page for ready analysis viewing: master-detail view where list of tasks and details for one
+- [ ] load final prompt template from resource file for easier updating
+- [ ] add dubug logging of sent requests and recieved responses
+- [ ] docker compose config
+- [ ] add hints to prompt configuration UI: like "must describe scoring system: what is bad, what is good", general recommendations of prompt engeneering, etc.
+- [ ] ensure independence from Deepseek LLM provider. Should be able easily add new LLM Provider
