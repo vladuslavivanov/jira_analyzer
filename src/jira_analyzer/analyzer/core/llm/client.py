@@ -1,10 +1,7 @@
 from __future__ import annotations
 
 import asyncio
-from queue import Empty, Queue
-from threading import Lock, Thread
 
-import asyncio
 from typing import Any
 
 from jira_analyzer.analyzer.core.llm.provider import LLMProvider

@@ -1,8 +1,6 @@
 import json
 import re
 from datetime import datetime, timedelta, timezone
-from queue import Empty, Queue
-from threading import Lock, Thread
 from typing import Any, Dict, List
 
 from jira_analyzer.analyzer.core.llm.client import LLMClient
