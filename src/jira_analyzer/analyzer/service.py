@@ -123,7 +123,7 @@ class AnalysisService:
         import importlib
 
         deepseek_module = importlib.import_module(
-            "jira_analyzer.analyzer.core.llm.deepseek_client"
+            "jira_analyzer.analyzer.core.llm.deepseek_provider"
         )
 
         provider_class = getattr(deepseek_module, "DeepSeekProvider", None)
@@ -143,7 +143,7 @@ class AnalysisService:
             return _LegacySendPromptProvider()
 
         raise ImportError(
-            "Could not resolve a default LLM provider from deepseek_client. "
+            "Could not resolve a default LLM provider from deepseek_provider. "
             "Make sure the module exposes DeepSeekProvider or send_prompt()."
         )
 

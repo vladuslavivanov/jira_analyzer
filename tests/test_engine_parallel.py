@@ -13,11 +13,11 @@ def test_run_analysis_processes_issues_with_multiple_workers(monkeypatch):
         await asyncio.sleep(1.0)
         return {"prompt": prompt, "system_prompt": system_prompt}
 
-    fake_module = types.ModuleType("jira_analyzer.analyzer.core.llm.deepseek_client")
+    fake_module = types.ModuleType("jira_analyzer.analyzer.core.llm.deepseek_provider")
     fake_module.send_prompt = fake_send_prompt
     monkeypatch.setitem(
         sys.modules,
-        "jira_analyzer.analyzer.core.llm.deepseek_client",
+        "jira_analyzer.analyzer.core.llm.deepseek_provider",
         fake_module,
     )
 
@@ -44,11 +44,11 @@ def test_run_analysis_uses_one_worker_as_minimum(monkeypatch):
     async def fake_send_prompt(prompt, system_prompt=None):
         return {"prompt": prompt}
 
-    fake_module = types.ModuleType("jira_analyzer.analyzer.core.llm.deepseek_client")
+    fake_module = types.ModuleType("jira_analyzer.analyzer.core.llm.deepseek_provider")
     fake_module.send_prompt = fake_send_prompt
     monkeypatch.setitem(
         sys.modules,
-        "jira_analyzer.analyzer.core.llm.deepseek_client",
+        "jira_analyzer.analyzer.core.llm.deepseek_provider",
         fake_module,
     )
 

@@ -17,9 +17,9 @@ def test_analysis_service_exposes_design_spec_methods(monkeypatch, tmp_path):
                 "criteria_scores": {"completeness": 100},
             }
 
-    fake_module = types.ModuleType("jira_analyzer.analyzer.core.llm.deepseek_client")
+    fake_module = types.ModuleType("jira_analyzer.analyzer.core.llm.deepseek_provider")
     fake_module.send_prompt = fake_send_prompt
-    monkeypatch.setitem(sys.modules, "jira_analyzer.analyzer.core.llm.deepseek_client", fake_module)
+    monkeypatch.setitem(sys.modules, "jira_analyzer.analyzer.core.llm.deepseek_provider", fake_module)
 
     service = AnalysisService(prompt_template="{element_type}: {description}", worker_count=1)
 
