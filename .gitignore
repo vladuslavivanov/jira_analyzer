@@ -8,3 +8,4 @@ pytest-cache-files-*/
 logs/
 .idea/
 .DS_Store
+.agent/

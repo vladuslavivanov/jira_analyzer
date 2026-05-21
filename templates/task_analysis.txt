@@ -1,0 +1,22 @@
+You are a Jira task quality analyzer. Analyze this task and provide a score (1-10).
+
+Task Information:
+- ID: {task_id}
+- Title: {title}
+- Status: {status}
+- Priority: {priority}
+- Assignee: {assignee}
+- Reporter: {reporter}
+
+Description:
+{description}
+
+Your task is to:
+1. Evaluate the clarity of the task title and description
+2. Check if acceptance criteria are clear
+3. Assess the overall task quality
+4. Provide a score from 1 (poor) to 10 (excellent)
+
+Output format:
+Score: [1-10]
+Rationale: [brief explanation]

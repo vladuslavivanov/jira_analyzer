@@ -1,0 +1,11 @@
+Analyze the following Jira tasks and provide a summary:
+
+{task_list}
+
+For each task, provide:
+- Task ID
+- Quality Score (1-10)
+- Brief rationale
+- Suggested improvements
+
+Finish with overall summary and recommendations.

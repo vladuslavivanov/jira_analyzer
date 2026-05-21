@@ -1,0 +1,22 @@
+# Jira AI Analyzer Configuration
+# SECURITY: All provider values must be set - no defaults exist
+# This configuration uses internal/self-hosted services only
+
+llm:
+  provider_type: openai-compatible
+  api_key: your-internal-api-key-here
+  base_url: http://localhost:11434/v1
+  model: your-internal-model-name-here
+  temperature: 0.7
+
+logging:
+  level: INFO
+  log_llm_prompts: false
+
+jira:
+  use_mock: true
+  mock_dataset_path: src/jira_analyzer/jira/data/jira_mock_data.json
+  error_on_jql: ""
+
+i18n:
+  language: en
