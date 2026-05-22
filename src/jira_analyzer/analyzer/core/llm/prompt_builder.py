@@ -102,7 +102,7 @@ def build_structured_prompt(
     return f"""Тип проблемы:
 {element_type}
 
-Описание проблемы:
+Описание задачи:
 {description}
 
 Общий промпт для анализа:
