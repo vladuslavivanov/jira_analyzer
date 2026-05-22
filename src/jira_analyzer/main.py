@@ -19,6 +19,7 @@ import json
 import sqlite3
 import streamlit as st
 from dataclasses import replace
+from datetime import datetime
 
 from jira_analyzer.config import ConfigLoader
 from jira_analyzer.utils.logger import setup_logging, get_logger
@@ -28,6 +29,7 @@ from jira_analyzer.analyzer.core.llm.prompt_builder import AnalysisPromptConfig,
 from jira_analyzer.analyzer.engine import get_default_analysis_prompt_config, run_analysis
 from jira_analyzer.storage import SqliteAnalysisResultRepository
 from jira_analyzer.tasktracker.jira import JiraConnectionConfig, fetch_issue, jira_issue_to_analysis_input, search_issues
+from jira_analyzer.app.output_handler import build_markdown_report
 
 # Initialize logger
 logger = get_logger(__name__)
@@ -289,7 +291,11 @@ def _render_prompt_editor(language: str) -> AnalysisPromptConfig:
     
 
 def _render_results(results, language: str):
-    """Render analysis results in a simple table format."""
+    """Render analysis results as single-page markdown report with download option.
+    
+    This matches the original implementation using build_markdown_report function
+    and displays the complete report with the ability to download as markdown file.
+    """
     # Create translation function for this component
     def t(key: str, **kwargs) -> str:
         """Local translation function with proper language parameter."""
@@ -298,26 +304,37 @@ def _render_results(results, language: str):
 
     st.subheader(t("markdown_report"))
     
-    # Simple table display
-    if isinstance(results, list):
-        df_data = []
-        for result in results:
-            if isinstance(result, dict):
-                df_data.append({
-                    "Issue": result.get("task_id", "Unknown"),
-                    "Title": result.get("title", "No title"),
-                    "Status": result.get("status", "Unknown"),
-                    "Score": result.get("overall_score", "N/A")
-                })
-        
-        if df_data:
-            import pandas as pd
-            df = pd.DataFrame(df_data)
-            st.dataframe(df)
-        else:
-            st.info("No results to display")
-    else:
-        st.info("Analysis completed. Results are stored in database.")
+    if not isinstance(results, list) or not results:
+        st.info("No results to display")
+        return
+    
+    # Filter out error results for complete report
+    valid_results = [r for r in results if not r.get('error')]
+    
+    if not valid_results:
+        st.warning("Analysis failed for all issues. Check error messages.")
+        return
+    
+    # Generate markdown report using original implementation
+    try:
+        markdown_report = build_markdown_report(valid_results)
+    except Exception as e:
+        logger.error(f"Failed to generate markdown report: {e}")
+        st.error(f"Failed to generate report: {e}")
+        return
+    
+    # Display the markdown report
+    st.markdown(markdown_report)
+    
+    # Download button for markdown file
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    st.download_button(
+        label="Download Markdown Report",
+        data=markdown_report,
+        file_name=f"jira_analysis_report_{timestamp}.md",
+        mime="text/markdown",
+        key="download_markdown_report"
+    )
 
 
 def main():
