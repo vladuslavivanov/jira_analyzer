@@ -2,6 +2,14 @@
 
 Tool for automatic data collection and analysis of Jira task tracker with AI-driven quality estimation.
 
+> «КАТАСТРОФА на проекте - ПРЕДОТВРАЩЕНА!
+Некачественные задачи ГОДАМИ протекали через джиру.
+Предыдущие руководители знали. Молчали. Мы пришли.
+Посмотрели. ИСПРАВИЛИ. Лучшая работа в истории.
+ПЕЧАЛЬНО, что это так мало!»
+>
+> — Дональд Джон Трамп, 45-й и 47-й президент США
+
 ## Installation
 
 1. Clone the repository.
