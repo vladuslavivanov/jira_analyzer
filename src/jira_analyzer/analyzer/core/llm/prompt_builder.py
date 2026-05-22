@@ -99,37 +99,37 @@ def build_structured_prompt(
         else "Do not include an overall_conclusion field."
     )
 
-    return f"""Issue type:
+    return f"""Тип проблемы:
 {element_type}
 
-Issue description:
+Описание проблемы:
 {description}
 
-General analysis prompt:
+Общий промпт для анализа:
 {config.general_prompt}
 
-Criteria:
-{criteria_block if criteria_block else "No separate criteria were provided."}
+Критерии:
+{criteria_block if criteria_block else "Отдельные критерии не были предоставлены."}
 
-Output requirements:
-- Return only valid JSON. Do not include markdown or explanatory text outside JSON.
-- Follow the JSON schema below exactly and keep the exact criterion ids.
-- Put every criterion result into the top-level "criteria" object.
-- Each criterion result must include title, description, scoring_system, and score.
-- Include a criterion review field only when that criterion explicitly asks for it.
-- For each criterion, include recommendations as an array of 1-3 specific suggestions based on the score for that criterion.
-- Put a compact score map into "criteria_scores" for downstream parsing.
-- criteria_scores values must mirror the matching criteria.*.score values.
-- Compute total_score as the average of all criteria_scores.
-- Aggregate all unique criterion recommendations into the top-level recommendations list.
-- Provide a list of recommendations for improving the issue description based on the analysis.
-- Do not add criteria that are not listed in the schema.
-- For binary criteria, score must be 0 or 1.
-- For percent criteria, score must be an integer from 0 to 100.
-- For five-point criteria, score must be an integer from 0 to 5.
+Требования к выводу:
+- Возвращай только корректный JSON. Не включай markdown или пояснительный текст вне JSON.
+- Строго следуй JSON-схеме ниже и сохраняй точные идентификаторы критериев.
+- Помести результат каждого критерия в объект верхнего уровня "criteria".
+- Результат каждого критерия должен включать: title, description, scoring_system и score.
+- Добавляй поле review для критерия только в том случае, если оно явно требуется этим критерием.
+- Для каждого критерия включай recommendations в виде массива из 1–3 конкретных предложений, основанных на оценке по этому критерию.
+- Помести компактную карту оценок в "criteria_scores" для последующего парсинга.
+- Значения criteria_scores должны соответствовать значениям criteria.*.score.
+- Вычисляй total_score как среднее значение всех criteria_scores.
+- Объединяй все уникальные рекомендации по критериям в список верхнего уровня recommendations.
+- Предоставь список рекомендаций по улучшению описания проблемы на основе анализа.
+- Не добавляй критерии, отсутствующие в схеме.
+- Для бинарных критериев значение score должно быть 0 или 1.
+- Для процентных критериев значение score должно быть целым числом от 0 до 100.
+- Для пятибалльных критериев значение score должно быть целым числом от 0 до 5.
 - {overall_instruction}
 
-JSON schema to follow:
+JSON-схема, которой необходимо следовать:
 {schema}
 """
 
