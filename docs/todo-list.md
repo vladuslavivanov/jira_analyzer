@@ -15,4 +15,4 @@
 - [ ] add dubug logging of sent requests and recieved responses
 - [ ] docker compose config
 - [ ] add hints to prompt configuration UI: like "must describe scoring system: what is bad, what is good", general recommendations of prompt engeneering, etc.
-- [ ] ensure independence from Deepseek LLM provider. Should be able easily add new LLM Provider
+- [x] ensure independence from Deepseek LLM provider. Should be able easily add new LLM Provider

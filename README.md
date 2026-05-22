@@ -18,6 +18,31 @@ Tool for automatic data collection and analysis of Jira task tracker with AI-dri
 
 The project uses a unified entry point via `python -m jira_analyzer`.
 
+### Quick Start (with Fake Provider)
+```bash
+# Make sure config.yaml is set up with fake provider
+python -m jira_analyzer
+```
+
+This starts the Streamlit web UI at `http://localhost:8501` with the fake LLM provider (no API keys needed).
+
+### Configuration
+
+The application uses YAML-based configuration (`config.yaml`). Key configuration options:
+
+- **LLM Provider:** 
+  - `provider_type: fake` - Use fake provider for testing (no API calls)
+  - `provider_type: openai-compatible` - Use real LLM via OpenAI-compatible API
+
+- **Jira Connection:**
+  - `jira.use_mock: true` - Use mock Jira service (recommended for testing)
+  - `jira.use_mock: false` - Connect to real Jira instance
+
+- **Logging:**
+  - `logging.level: INFO` (DEBUG, INFO, WARNING, ERROR)
+
+See `config.yaml.sample` for all available options.
+
 ### Web User Interface (Streamlit)
 Launch the interactive browser-based UI:
 

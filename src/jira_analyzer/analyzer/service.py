@@ -11,6 +11,9 @@ from jira_analyzer.analyzer.core.llm.prompt_builder import (
     get_default_prompt_config,
 )
 from jira_analyzer.analyzer.core.llm.provider import LLMProvider
+from jira_analyzer.analyzer.core.llm.provider_adapter import ProviderAdapter
+from jira_analyzer.providers import ProviderFactory
+from jira_analyzer.config.loader import ConfigLoader
 from jira_analyzer.app.output_handler import build_markdown_report
 from jira_analyzer.tasktracker.jira import JiraConnectionConfig
 from jira_analyzer.tasktracker.repository import (
@@ -120,32 +123,35 @@ class AnalysisService:
         return json.dumps(results, ensure_ascii=False, indent=2)
 
     def _resolve_default_provider(self) -> LLMProvider:
-        import importlib
-
-        deepseek_module = importlib.import_module(
-            "jira_analyzer.analyzer.core.llm.deepseek_provider"
-        )
-
-        provider_class = getattr(deepseek_module, "DeepSeekProvider", None)
-        if provider_class is not None:
-            return provider_class()
-
-        send_prompt = getattr(deepseek_module, "send_prompt", None)
-        if callable(send_prompt):
-            class _LegacySendPromptProvider(LLMProvider):
-                def send_prompt(
-                    self,
-                    prompt: str,
-                    system_prompt: str | None = None,
-                ) -> dict[str, Any]:
-                    return send_prompt(prompt, system_prompt)
-
-            return _LegacySendPromptProvider()
-
-        raise ImportError(
-            "Could not resolve a default LLM provider from deepseek_provider. "
-            "Make sure the module exposes DeepSeekProvider or send_prompt()."
-        )
+        """Resolve default provider from YAML configuration.
+        
+        Uses the new provider architecture with ProviderFactory
+        instead of the legacy DeepSeek-specific provider.
+        """
+        try:
+            # Load configuration from config.yaml
+            config = ConfigLoader.load_from_path("config.yaml")
+            
+            # Create provider using ProviderFactory
+            # TODO: provider factory use provider type from config and pass all remaining args to certain provider
+            base_provider = ProviderFactory.create_provider({
+                "provider_type": config.llm.provider_type,
+                "api_key": config.llm.api_key,
+                "base_url": config.llm.base_url,
+                "model": config.llm.model,
+                "default_response": getattr(config.llm, "default_response", None),
+                "responses": getattr(config.llm, "responses", None)
+            })
+            
+            # Wrap synchronous provider in async adapter for legacy compatibility
+            return ProviderAdapter(base_provider)
+            
+        except Exception as e:
+            logger.error(f"Failed to create provider from config: {e}")
+            raise ImportError(
+                f"Could not create LLM provider from config.yaml: {e}. "
+                "Ensure config.yaml exists and contains valid provider configuration."
+            )
 
     async def _async_analyze_issues(self, issues: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         total = len(issues)

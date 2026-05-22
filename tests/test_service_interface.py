@@ -1,27 +1,32 @@
 from __future__ import annotations
 
 import json
-import sys
-import types
+import asyncio
 
 from jira_analyzer.analyzer.service import AnalysisService
+from jira_analyzer.analyzer.core.llm.provider import LLMProvider
 
 
-def test_analysis_service_exposes_design_spec_methods(monkeypatch, tmp_path):
-    async def fake_send_prompt(prompt, system_prompt=None):
-            return {
-                "prompt": prompt,
-                "system_prompt": system_prompt,
-                "overall_conclusion": "ok",
-                "criteria": {"completeness": {"title": "Completeness", "description": "Test", "scoring_system": "percent", "score": 100}},
-                "criteria_scores": {"completeness": 100},
-            }
+class FakeLLMProvider(LLMProvider):
+    """Fake async provider for testing."""
+    
+    async def send_prompt(self, prompt: str, system_prompt: str | None = None) -> dict:
+        return {
+            "prompt": prompt,
+            "system_prompt": system_prompt,
+            "overall_conclusion": "ok",
+            "criteria": {"completeness": {"title": "Completeness", "description": "Test", "scoring_system": "percent", "score": 100}},
+            "criteria_scores": {"completeness": 100},
+        }
 
-    fake_module = types.ModuleType("jira_analyzer.analyzer.core.llm.deepseek_provider")
-    fake_module.send_prompt = fake_send_prompt
-    monkeypatch.setitem(sys.modules, "jira_analyzer.analyzer.core.llm.deepseek_provider", fake_module)
 
-    service = AnalysisService(prompt_template="{element_type}: {description}", worker_count=1)
+def test_analysis_service_exposes_design_spec_methods(tmp_path):
+    fake_provider = FakeLLMProvider()
+    service = AnalysisService(
+        prompt_template="{element_type}: {description}", 
+        worker_count=1,
+        llm_provider=fake_provider
+    )
 
     issue = {
         "jira_key": "YA-1",

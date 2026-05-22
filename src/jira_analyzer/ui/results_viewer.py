@@ -58,10 +58,10 @@ class ResultsViewer:
         cursor = self._db.cursor()
         cursor.execute("""
             SELECT
-                id, task_id, title, status, priority,
-                assignee, reporter, quality_score, rationale,
-                analyzed_at
+                task_id, title, status, assignee,
+                total_score, summary, analyzed_at
             FROM analysis_results
+            WHERE state = 'COMPLETED'
             ORDER BY analyzed_at DESC
         """)
         columns = [col[0] for col in cursor.description]
@@ -77,7 +77,7 @@ class ResultsViewer:
         """
         # Prepare display options: "PROJ-001 - Fix bug - Score: 8"
         options = [
-            f"{r['task_id']} - {r['title']} - Score: {r['quality_score']}"
+            f"{r['task_id']} - {r['title']} - Score: {r['total_score']}"
             for r in results
         ]
 
@@ -118,15 +118,13 @@ class ResultsViewer:
             st.write(f"**ID:** {result['task_id']}")
             st.write(f"**Title:** {result['title']}")
             st.write(f"**Status:** {result['status']}")
-            st.write(f"**Priority:** {result['priority']}")
             st.write(f"**Assignee:** {result['assignee']}")
-            st.write(f"**Reporter:** {result['reporter']}")
             st.write(f"**Analyzed At:** {result['analyzed_at']}")
 
         # Right column: Analysis results
         with col2:
             st.subheader("Quality Analysis")
-            score = result['quality_score']
+            score = result['total_score']
             
             # Simple color coding based on score
             if 1 <= score <= 4:
@@ -143,8 +141,8 @@ class ResultsViewer:
                 unsafe_allow_html=True
             )
 
-            st.write("**Rationale:**")
-            st.write(result['rationale'])
+            st.write("**Summary:**")
+            st.write(result['summary'])
 
         # Download option
         st.download_button(

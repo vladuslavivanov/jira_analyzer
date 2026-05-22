@@ -40,7 +40,7 @@ class BaseLLMProvider(ABC):
     @property
     @abstractmethod
     def provider_name(self) -> str:
-        """Return provider identifier (e.g., 'openai', 'deepseek')."""
+        """Return provider identifier (e.g., 'openai-compatible', 'fake')."""  
         pass
 
     @abstractmethod
