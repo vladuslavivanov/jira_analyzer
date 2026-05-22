@@ -63,6 +63,10 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
         "quality_score": "Quality Score",
         "rationale": "Rationale",
         "no_results": "No results found",
+        "select_task": "Select Task",
+        "task_information": "Task Information",
+        "quality_analysis": "Quality Analysis",
+        "download_result": "Download Result (JSON)",
 
         # Settings
         "settings": "Settings",
@@ -142,6 +146,10 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
         "quality_score": "Оценка качества",
         "rationale": "Обоснование",
         "no_results": "Результаты не найдены",
+        "select_task": "Выберите задачу",
+        "task_information": "Информация о задаче",
+        "quality_analysis": "Анализ качества",
+        "download_result": "Скачать результат (JSON)",
 
         # Settings
         "settings": "Настройки",
