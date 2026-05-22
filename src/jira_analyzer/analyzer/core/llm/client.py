@@ -5,7 +5,9 @@ import asyncio
 from typing import Any
 
 from jira_analyzer.analyzer.core.llm.provider import LLMProvider
+from jira_analyzer.utils.logger import setup_logger
 
+logger = setup_logger(__name__)
 
 class LLMClient:
     """Manages queued LLM requests with configurable concurrency."""
@@ -23,6 +25,7 @@ class LLMClient:
 
     async def send_prompt(self, prompt: str, system_prompt: str | None = None) -> dict[str, Any]:
         """Send a single prompt through the configured provider."""
+        logger.info(f"{prompt=}, {system_prompt=}")
         async with self._semaphore:
             return await self.provider.send_prompt(prompt, system_prompt)
 
