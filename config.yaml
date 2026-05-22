@@ -2,12 +2,33 @@
 # SECURITY: All provider values must be set - no defaults exist
 # This configuration uses internal/self-hosted services only
 
+# ==================== LLM Provider Configuration ====================
+# Choose one provider type:
+# - "openai-compatible" for real LLM API calls
+# - "fake" for testing without external requests (returns hardcoded responses)
 llm:
-  provider_type: openai-compatible
+  # Provider type: "openai-compatible" or "fake"
+  provider_type: fake
+  
+  # ==================== OpenAI-Compatible Provider Settings ====================
+  # Required when provider_type: "openai-compatible"
+  # Ignored when provider_type: "fake"
   api_key: your-internal-api-key-here
   base_url: http://localhost:11434/v1
   model: your-internal-model-name-here
   temperature: 0.7
+  
+  # ==================== Fake Provider Settings ====================
+  # Optional when provider_type: "fake"
+  # Ignored when provider_type: "openai-compatible"
+  # Uncomment and customize these for testing scenarios
+  
+  # default_response: "This is a custom fake response for testing"
+  
+  # responses:
+  #   analyze: "Analysis complete: found 3 critical issues"
+  #   summarize: "Summary: Authentication flow with user feedback"
+  #   evaluate: "Evaluation score: 7.5/10 - meets most criteria"
 
 logging:
   level: INFO

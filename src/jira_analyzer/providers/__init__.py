@@ -9,12 +9,14 @@ from typing import Dict, Any
 
 from .base import BaseLLMProvider, LLMMessage, LLMResponse
 from .openai_provider import OpenAICompatibleProvider
+from .fake_provider import FakeLLMProvider
 
 __all__ = [
     "BaseLLMProvider",
     "LLMMessage", 
     "LLMResponse",
     "OpenAICompatibleProvider",
+    "FakeLLMProvider",
     "ProviderFactory",
 ]
 
@@ -68,8 +70,15 @@ class ProviderFactory:
                 base_url=config["base_url"],
                 model=config["model"]
             )
+        elif provider_type == "fake":
+            # Fake provider doesn't require API keys or URLs
+            # Useful for testing without external dependencies
+            return FakeLLMProvider(
+                responses=config.get("responses"),
+                default_response=config.get("default_response")
+            )
         else:
             raise ValueError(
                 f"Unknown provider: {provider_type}. "
-                f"Supported providers: openai-compatible"
+                f"Supported providers: openai-compatible, fake"
             )
