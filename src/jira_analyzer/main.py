@@ -647,7 +647,7 @@ def results_page(config, language, db_path):
     # Database connection
     @st.cache_resource
     def get_db():
-        return sqlite3.connect(db_path)
+        return sqlite3.connect(db_path, check_same_thread=False)
 
     db = get_db()
 

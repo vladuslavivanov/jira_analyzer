@@ -77,7 +77,7 @@ class ResultsViewer:
         """
         # Prepare display options: "PROJ-001 - Fix bug - Score: 8"
         options = [
-            f"{r['task_id']} - {r['title']} - Score: {r['total_score']}"
+            f"{r['task_id']} - {r['title']} - Score: {r.get('total_score', 'N/A')}"
             for r in results
         ]
 
@@ -124,20 +124,26 @@ class ResultsViewer:
         # Right column: Analysis results
         with col2:
             st.subheader("Quality Analysis")
-            score = result['total_score']
+            score = result.get('total_score')
             
-            # Simple color coding based on score
-            if 1 <= score <= 4:
-                color = "red"
-            elif 5 <= score <= 7:
-                color = "orange"
-            elif 8 <= score <= 10:
-                color = "green"
-            else:
+            # Handle missing/null scores
+            if score is None:
                 color = "gray"
+                display_score = "N/A"
+            else:
+                display_score = str(score)
+                # Simple color coding based on score
+                if 1 <= score <= 4:
+                    color = "red"
+                elif 5 <= score <= 7:
+                    color = "orange"
+                elif 8 <= score <= 10:
+                    color = "green"
+                else:
+                    color = "gray"
 
             st.markdown(
-                f"### Quality Score: <span style='color:{color}'>{score}/10</span>",
+                f"### Quality Score: <span style='color:{color}'>{display_score}/10</span>",
                 unsafe_allow_html=True
             )
 
