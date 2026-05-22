@@ -27,7 +27,9 @@ class LLMClient:
         """Send a single prompt through the configured provider."""
         logger.info(f"{prompt=}, {system_prompt=}")
         async with self._semaphore:
-            return await self.provider.send_prompt(prompt, system_prompt)
+            prompt_response = await self.provider.send_prompt(prompt, system_prompt)
+            logger.debug(f"{prompt_response=}")
+            return prompt_response
 
     async def send_prompts(self, requests: list[tuple[str, str | None]]) -> list[dict[str, Any]]:
         """Send multiple prompts asynchronously."""
