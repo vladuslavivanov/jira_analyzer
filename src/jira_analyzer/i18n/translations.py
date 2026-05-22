@@ -12,8 +12,44 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
     "en": {
         # Main UI
         "app_title": "Jira AI Analyzer",
+        "caption": "Analyze Jira issues from JSON, a single Jira key, or a JQL query.",
+        "analysis_tab": "Analysis",
+        "results_tab": "Results",
         "start_analysis": "Start Analysis",
         "results": "Results",
+
+        # Database section
+        "database_settings": "Database Settings",
+        "database_path": "Database Path",
+        "database_path_help": "Path to SQLite database for analysis results",
+
+        # Data source section
+        "data_source": "Data Source",
+        "select_data_source": "Select data source",
+        "select_data_source_help": "Choose JSON file upload or Jira connection",
+
+        # Prompt configuration section
+        "prompt_configuration": "Prompt Configuration",
+        "system_prompt_help": "Define AI system behavior and role",
+        "general_prompt_help": "General instructions for issue analysis",
+        "criteria_help": "Define quality criteria for issue evaluation",
+        "prompt_config_io": "Prompt Config Import/Export",
+        "export_prompt_config": "Export Configuration",
+        "download_json": "Download JSON",
+        "prompt_config_file": "Upload Configuration File",
+        "prompt_config_imported": "Configuration imported successfully",
+        "invalid_prompt_config": "Invalid configuration: {error}",
+        "analysis_prompt": "Analysis Prompts",
+        "prompt_caption": "Configure system and general prompts for AI analysis",
+        "system_prompt": "System Prompt",
+        "general_prompt": "General Prompt",
+        "include_overall": "Include Overall Conclusion",
+        "criteria": "Quality Criteria",
+        "criterion": "Criterion {number}",
+        "criterion_name": "Criterion Name",
+        "criterion_description": "Description",
+        "scoring_system": "Scoring System",
+        "include_criterion_review": "Include Detailed Review",
 
         # Input fields
         "jql_query": "JQL Query",
@@ -38,6 +74,14 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
         "use_sample": "Use Sample Data",
         "worker_count": "Worker Count",
         "run_analysis": "Run Analysis",
+        "split_by_criterion": "Split by Criterion",
+        "split_by_criterion_help": "Analyze each quality criterion separately",
+        "analyzing": "Analyzing {count} issues with {workers} workers...",
+        "analysis_complete": "Analysis completed successfully",
+        "analysis_error": "Analysis failed: {error}",
+        "no_issues": "No issues found to analyze",
+        "markdown_report": "Analysis Report",
+        "jira_issue_key": "Jira Issue Key",
 
         # Errors
         "error_title": "Error",
@@ -47,8 +91,44 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
     "ru": {
         # Main UI
         "app_title": "AI Анализатор Jira",
+        "caption": "Анализируйте Jira-задачи из JSON, по ключу задачи или через JQL.",
+        "analysis_tab": "Анализ",
+        "results_tab": "Результаты",
         "start_analysis": "Начать анализ",
         "results": "Результаты",
+
+        # Database section
+        "database_settings": "Настройки базы данных",
+        "database_path": "Путь к базе данных",
+        "database_path_help": "Путь к базе данных SQLite для результатов анализа",
+
+        # Data source section  
+        "data_source": "Источник данных",
+        "select_data_source": "Выберите источник данных",
+        "select_data_source_help": "Выберите загрузку JSON или подключение к Jira",
+
+        # Prompt configuration section  
+        "prompt_configuration": "Конфигурация промпта",
+        "system_prompt_help": "Определите поведение и роль ИИ",
+        "general_prompt_help": "Общие инструкции для анализа задач",
+        "criteria_help": "Определите критерии качества для оценки задач",
+        "prompt_config_io": "Импорт/Экспорт конфигурации",
+        "export_prompt_config": "Экспорт конфигурации",
+        "download_json": "Скачать JSON",
+        "prompt_config_file": "Загрузить файл конфигурации",
+        "prompt_config_imported": "Конфигурация импортирована успешно",
+        "invalid_prompt_config": "Неверная конфигурация: {error}",
+        "analysis_prompt": "Промпты анализа",
+        "prompt_caption": "Настройте системные и общие промпты для ИИ анализа",
+        "system_prompt": "Системный промпт",
+        "general_prompt": "Общий промпт",
+        "include_overall": "Включить общий вывод",
+        "criteria": "Критерии качества",
+        "criterion": "Критерий {number}",
+        "criterion_name": "Название критерия",
+        "criterion_description": "Описание",
+        "scoring_system": "Система оценки",
+        "include_criterion_review": "Включить подробный обзор",
 
         # Input fields
         "jql_query": "JQL Запрос",
@@ -73,6 +153,14 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
         "use_sample": "Использовать примеры",
         "worker_count": "Количество потоков",
         "run_analysis": "Запустить анализ",
+        "split_by_criterion": "Разбить по критерию",
+        "split_by_criterion_help": "Анализировать каждый критерий качества отдельно",
+        "analyzing": "Анализ {count} задач с {workers} потоками...",
+        "analysis_complete": "Анализ завершен успешно",
+        "analysis_error": "Анализ не удался: {error}",
+        "no_issues": "Не найдено задач для анализа",
+        "markdown_report": "Отчет об анализе",
+        "jira_issue_key": "Ключ задачи Jira",
 
         # Errors
         "error_title": "Ошибка",
