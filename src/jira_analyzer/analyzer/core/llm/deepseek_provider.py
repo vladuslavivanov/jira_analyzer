@@ -4,9 +4,9 @@ from openai import AsyncOpenAI
 
 from jira_analyzer.analyzer.core.llm.provider import LLMProvider
 from jira_analyzer.utils.config import DEEPSEEK_API_KEY, DEEPSEEK_BASE_URL, DEEPSEEK_MODEL
-from jira_analyzer.utils.logger import setup_logger
+from jira_analyzer.utils.logger import get_logger
 
-logger = setup_logger(__name__)
+logger = get_logger(__name__)
 
 DEFAULT_SYSTEM_PROMPT = (
     "You are a strict but constructive Jira issue quality analyst. "

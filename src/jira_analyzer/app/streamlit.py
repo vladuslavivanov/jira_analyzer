@@ -21,9 +21,9 @@ from jira_analyzer.tasktracker.jira import (
     search_issues,
 )
 from jira_analyzer.tasktracker.jira.jira_parser import load_issues
-from jira_analyzer.utils.logger import setup_logger
+from jira_analyzer.utils.logger import get_logger
 
-logger = setup_logger(__name__)
+logger = get_logger(__name__)
 
 SCORING_OPTIONS = {
     "0/1": "binary",

@@ -33,9 +33,20 @@ class LogConfig:
 
 @dataclass
 class JiraConfig:
-    """Jira integration configuration."""
-    use_mock: bool = True  # Use fake service?
-    mock_dataset_path: str = "data/jira_mock_data.json"
+    """Jira integration configuration.
+    
+    Supports both real Jira servers and mock service.
+    """
+    use_mock: bool = False  # Use mock service instead of real Jira
+    
+    # Real Jira connection settings (required when use_mock=False)
+    server_url: Optional[str] = None  # Jira server URL (e.g., "https://jira.company.com")
+    username: Optional[str] = None  # Jira username for authentication
+    api_token: Optional[str] = None  # Jira API token for authentication
+    verify_ssl: bool = True  # SSL verification for HTTPS connections
+    
+    # Mock service settings (used when use_mock=True)
+    mock_dataset_path: str = "src/jira_analyzer/jira/data/jira_mock_data.json"
     error_on_jql: str = ""  # JQL that triggers error (empty = none)
 
 

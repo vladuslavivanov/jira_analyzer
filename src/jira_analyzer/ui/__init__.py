@@ -9,7 +9,7 @@ from .guidance import (
     get_guidance,
     guided_text_input,
     guided_selectbox,
-    guided_slider,
+    guided_number_input,
     guided_button,
 )
 
@@ -18,6 +18,6 @@ __all__ = [
     "get_guidance",
     "guided_text_input",
     "guided_selectbox",
-    "guided_slider",
+    "guided_number_input",
     "guided_button",
 ]

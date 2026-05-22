@@ -1,9 +1,8 @@
 import json
 from typing import Any, Dict, List
+from jira_analyzer.utils.logger import get_logger
 
-from jira_analyzer.utils.logger import setup_logger
-
-logger = setup_logger(__name__)
+logger = get_logger(__name__)
 
 
 def load_issues(file_path: str) -> List[Dict[str, Any]]:

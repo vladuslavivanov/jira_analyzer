@@ -4,9 +4,9 @@ import os
 from dataclasses import dataclass
 from typing import Any
 
-from jira_analyzer.utils.logger import setup_logger
+from jira_analyzer.utils.logger import get_logger
 
-logger = setup_logger(__name__)
+logger = get_logger(__name__)
 
 
 @dataclass(frozen=True)

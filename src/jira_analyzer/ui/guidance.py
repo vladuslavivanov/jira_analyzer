@@ -17,6 +17,7 @@ GUIDANCE_TEXTS: Dict[str, Dict[str, str]] = {
         "batch_analysis_help": "Analyze multiple tasks at once.",
         "quality_threshold_help": "Minimum quality score (1-10).",
         "model_selection_help": "Choose AI model: gpt-4 for quality, gpt-3.5 for speed.",
+        "worker_help": "Number of parallel worker threads for analysis.",
     },
     "ru": {
         "jql_help": "Используйте JQL для фильтрации задач. Пример: `status = Open AND priority = High'",
@@ -24,6 +25,7 @@ GUIDANCE_TEXTS: Dict[str, Dict[str, str]] = {
         "batch_analysis_help": "Анализ нескольких задач одновременно.",
         "quality_threshold_help": "Минимальная оценка качества (1-10).",
         "model_selection_help": "Выберите модель ИИ: gpt-4 для качества, gpt-3.5 для скорости.",
+        "worker_help": "Количество параллельных потоков анализа.",
     },
 }
 
@@ -103,24 +105,24 @@ def guided_selectbox(
     )
 
 
-def guided_slider(
+def guided_number_input(
     label_key: str,
     help_key: str,
     language: str = "en",
     **kwargs
 ) -> int:
-    """Create slider with help tooltip.
+    """Create number input with help tooltip.
 
     Args:
         label_key: Translation key for label
         help_key: Guidance key for help text
         language: Language code
-        **kwargs: Additional arguments for st.slider
+        **kwargs: Additional arguments for st.number_input
 
     Returns:
-        Selected integer value
+        User input value
     """
-    return st.slider(
+    return st.number_input(
         label=get_text(label_key, language),
         help=get_guidance(help_key, language),
         **kwargs

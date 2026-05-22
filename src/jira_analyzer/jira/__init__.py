@@ -1,10 +1,17 @@
-"""Mock Jira service module.
+"""Jira service module.
 
-This module provides a simple mock Jira client that returns
-pre-defined data from a JSON file. Useful for development and
-testing without requiring a real Jira instance.
+This module provides both real Jira client integration
+and simple mock service for development and testing.
 """
 
-from .mock_client import MockJiraClient
+from typing import Union
+from .client_factory import create_jira_client, MockJiraClient
 
-__all__ = ["MockJiraClient"]
+# Type alias for Jira client (either mock or real)
+JiraClient = Union[MockJiraClient, object]  # object for JiraTaskClient
+
+__all__ = [
+    "create_jira_client",
+    "MockJiraClient", 
+    "JiraClient",
+]

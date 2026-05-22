@@ -14,7 +14,13 @@ logging:
   log_llm_prompts: false
 
 jira:
-  use_mock: true
+  use_mock: true  # Use mock service for development
+  server_url: https://your-jira.company.com  # Jira server URL (not used when use_mock=true)
+  username: ""  # Jira username (not used when use_mock=true)
+  api_token: ""  # Jira API token (not used when use_mock=true)
+  verify_ssl: true  # SSL verification for HTTPS connections
+  
+  # Mock service settings (used when use_mock=true)
   mock_dataset_path: src/jira_analyzer/jira/data/jira_mock_data.json
   error_on_jql: ""
 

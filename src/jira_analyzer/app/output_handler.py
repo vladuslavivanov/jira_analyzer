@@ -4,9 +4,9 @@ from pathlib import Path
 from typing import Any, Dict, List
 
 from jira_analyzer.storage.sqlite_repository import SqliteAnalysisResultRepository
-from jira_analyzer.utils.logger import setup_logger
+from jira_analyzer.utils.logger import get_logger
 
-logger = setup_logger(__name__)
+logger = get_logger(__name__)
 
 
 def save_results(results: List[Dict[str, Any]], output_path: str) -> None:

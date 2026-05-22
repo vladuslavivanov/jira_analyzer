@@ -20,9 +20,9 @@ from jira_analyzer.tasktracker.repository import (
 )
 from jira_analyzer.storage import AnalysisResultRepository
 import asyncio
-from jira_analyzer.utils.logger import setup_logger
+from jira_analyzer.utils.logger import get_logger
 
-logger = setup_logger(__name__)
+logger = get_logger(__name__)
 
 
 class AnalysisService:

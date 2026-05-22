@@ -13,7 +13,7 @@ from jira_analyzer.tasktracker.jira import (
     search_issues,
 )
 from jira_analyzer.tasktracker.jira.jira_parser import load_issues
-from jira_analyzer.utils.logger import setup_logger
+from jira_analyzer.utils.logger import get_logger
 
 # Constants for defaults
 SCRIPT_DIR = Path(__file__).parent.resolve()
@@ -22,7 +22,7 @@ DEFAULT_DATA_DIR = PROJECT_ROOT / "data"
 DEFAULT_INPUT_FILE = DEFAULT_DATA_DIR / "input.json"
 DEFAULT_OUTPUT_FILE = DEFAULT_DATA_DIR / "output.json"
 
-logger = setup_logger(__name__)
+logger = get_logger(__name__)
 
 def _is_closed_status(issue: dict) -> bool:
     status = issue.get("status", "").lower()

@@ -28,6 +28,17 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
         "rationale": "Rationale",
         "no_results": "No results found",
 
+        # Settings
+        "settings": "Settings",
+        "language": "Language",
+        "issue_source": "Issue Source",
+        "connection": "Connection",
+        "jira_query_mode": "Jira Query Mode",
+        "upload_jira_json": "Upload Jira JSON",
+        "use_sample": "Use Sample Data",
+        "worker_count": "Worker Count",
+        "run_analysis": "Run Analysis",
+
         # Errors
         "error_title": "Error",
         "jira_connection_error": "Failed to connect to Jira",
@@ -51,6 +62,17 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
         "quality_score": "Оценка качества",
         "rationale": "Обоснование",
         "no_results": "Результаты не найдены",
+
+        # Settings
+        "settings": "Настройки",
+        "language": "Язык",
+        "issue_source": "Источник задач",
+        "connection": "Подключение",
+        "jira_query_mode": "Режим JQL запроса",
+        "upload_jira_json": "Загрузить Jira JSON",
+        "use_sample": "Использовать примеры",
+        "worker_count": "Количество потоков",
+        "run_analysis": "Запустить анализ",
 
         # Errors
         "error_title": "Ошибка",
