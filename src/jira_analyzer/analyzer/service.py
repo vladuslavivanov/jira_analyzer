@@ -3,6 +3,9 @@ import re
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List
 
+import asyncio
+
+from jira_analyzer.analyzer.core.llm.adapter import SyncToAsyncLLMAdapter
 from jira_analyzer.analyzer.core.llm.client import LLMClient
 from jira_analyzer.analyzer.core.llm.prompt_builder import (
     AnalysisPromptConfig,
@@ -12,6 +15,7 @@ from jira_analyzer.analyzer.core.llm.prompt_builder import (
 )
 from jira_analyzer.analyzer.core.llm.provider import LLMProvider
 from jira_analyzer.app.output_handler import build_markdown_report
+from jira_analyzer.providers import ProviderFactory
 from jira_analyzer.tasktracker.jira import JiraConnectionConfig
 from jira_analyzer.tasktracker.repository import (
     JiraTasksRepository,
@@ -19,7 +23,7 @@ from jira_analyzer.tasktracker.repository import (
     TasksRepository,
 )
 from jira_analyzer.storage import AnalysisResultRepository
-import asyncio
+from jira_analyzer.utils.config import resolve_llm_config
 from jira_analyzer.utils.logger import setup_logger
 
 logger = setup_logger(__name__)
@@ -120,32 +124,29 @@ class AnalysisService:
         return json.dumps(results, ensure_ascii=False, indent=2)
 
     def _resolve_default_provider(self) -> LLMProvider:
-        import importlib
-
-        deepseek_module = importlib.import_module(
-            "jira_analyzer.analyzer.core.llm.deepseek_provider"
-        )
-
-        provider_class = getattr(deepseek_module, "DeepSeekProvider", None)
-        if provider_class is not None:
-            return provider_class()
-
-        send_prompt = getattr(deepseek_module, "send_prompt", None)
-        if callable(send_prompt):
-            class _LegacySendPromptProvider(LLMProvider):
-                def send_prompt(
-                    self,
-                    prompt: str,
-                    system_prompt: str | None = None,
-                ) -> dict[str, Any]:
-                    return send_prompt(prompt, system_prompt)
-
-            return _LegacySendPromptProvider()
-
-        raise ImportError(
-            "Could not resolve a default LLM provider from deepseek_provider. "
-            "Make sure the module exposes DeepSeekProvider or send_prompt()."
-        )
+        """Resolve default LLM provider using the new provider agnostic architecture.
+        
+        Uses ProviderFactory to create sync provider and wraps it in adapter
+        for compatibility with the async AnalysisService infrastructure.
+        
+        Returns:
+            LLMProvider instance compatible with async LLMClient
+        """
+        try:
+            # Get provider configuration from environment
+            provider_config = resolve_llm_config()
+            
+            # Create synchronous provider using factory
+            sync_provider = ProviderFactory.create_provider(provider_config)
+            
+            # Wrap synchronous provider in async adapter
+            return SyncToAsyncLLMAdapter(sync_provider)
+            
+        except Exception as error:
+            raise ImportError(
+                f"Could not resolve default LLM provider: {error}. "
+                "Ensure LLM_PROVIDER_TYPE and related environment variables are set."
+            ) from error
 
     async def _async_analyze_issues(self, issues: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         total = len(issues)

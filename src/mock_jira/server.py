@@ -206,6 +206,16 @@ def make_handler(issues: dict[str, dict[str, Any]]) -> type[BaseHTTPRequestHandl
 
             issue_key = self._extract_issue_key(path_parts)
             if issue_key is not None:
+                # Return bad request for "error" issue key
+                if issue_key.upper() == "ERROR":
+                    self._send_json(
+                        {
+                            "errorMessages": ["Bad request"],
+                            "errors": {},
+                        },
+                        status=HTTPStatus.BAD_REQUEST,
+                    )
+                    return
                 issue = issues.get(issue_key.upper())
                 if issue is None:
                     self._send_json(
@@ -321,14 +331,26 @@ def make_handler(issues: dict[str, dict[str, Any]]) -> type[BaseHTTPRequestHandl
             start_at: int,
             max_results: int,
         ) -> None:
-            matched = filter_issues_by_jql(issues, jql)
-            paged = matched[start_at : start_at + max_results]
+            # Return bad request for exact "error" JQL query
+            if jql.strip().lower() == "error":
+                self._send_json(
+                    {
+                        "errorMessages": ["Bad request"],
+                        "errors": {},
+                    },
+                    status=HTTPStatus.BAD_REQUEST,
+                )
+                return
+            
+            # Return all issues from datasource (ignore JQL filtering)
+            all_issues = list(issues.values())
+            paged = all_issues[start_at : start_at + max_results]
             self._send_json(
                 {
                     "expand": "schema,names",
                     "startAt": start_at,
                     "maxResults": max_results,
-                    "total": len(matched),
+                    "total": len(all_issues),
                     "issues": paged,
                 }
             )

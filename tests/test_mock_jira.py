@@ -68,8 +68,9 @@ def test_search_issues_by_key_in_jql(mock_jira_server):
         f"{mock_jira_server}/rest/api/2/search?jql={quote('key in (YA-2)')}"
     )
 
-    assert search["total"] == 1
-    assert search["issues"][0]["key"] == "YA-2"
+    # Search endpoint now returns ALL issues (ignores JQL filtering)
+    assert search["total"] == 2
+    assert [issue["key"] for issue in search["issues"]] == ["YA-1", "YA-2"]
 
 
 def test_get_missing_issue_returns_404(mock_jira_server):
@@ -77,3 +78,17 @@ def test_get_missing_issue_returns_404(mock_jira_server):
         get_json(f"{mock_jira_server}/rest/api/2/issue/NOPE-1")
 
     assert error.value.code == 404
+
+
+def test_search_with_exact_error_jql_returns_bad_request(mock_jira_server):
+    """Test that exact 'error' JQL query returns 400 Bad Request."""
+    with pytest.raises(HTTPError) as error:
+        get_json(f"{mock_jira_server}/rest/api/2/search?jql={quote('error')}")
+    assert error.value.code == 400
+
+
+def test_get_issue_by_error_key_returns_bad_request(mock_jira_server):
+    """Test that getting issue with 'ERROR' key returns 400 Bad Request."""
+    with pytest.raises(HTTPError) as error:
+        get_json(f"{mock_jira_server}/rest/api/2/issue/ERROR")
+    assert error.value.code == 400
