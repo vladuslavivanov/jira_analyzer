@@ -4,7 +4,7 @@ This module defines the exact JSON schema format expected from LLM providers
 based on the prompt_builder.py implementation and AnalysisPromptConfig dataclass.
 """
 
-from typing import Literal, get_args
+from typing import Literal
 
 # From prompt_builder.py
 ScoringSystem = Literal["binary", "percent", "five"]
@@ -54,15 +54,16 @@ def get_default_fake_response() -> str:
 
 
 def get_reseted_high_response() -> str:
-    """Generate fake response for well-scoring criteria for reset (评判)"""
+    """Generate fake response for well-scoring criteria for reset evaluation"""
     import json
     
     return json.dumps({
         "criteria": {
             "criterion_1": {
-                "title": "可达性",
+                "title": "Reachability",
                 "description": (
-                    "问题是否可以在当前上下文中验证解决，具有明确的验收标准（DoD）或可验证的缓解措施。"
+                    "Check whether the issue can be verified and resolved in the current context, "
+                    "with clear acceptance criteria (DoD) or verifiable mitigation measures."
                 ),
                 "scoring_system": "percent",
                 "score": 90,
@@ -72,9 +73,9 @@ def get_reseted_high_response() -> str:
                 }
             },
             "criterion_2": {
-                "title": "清晰度",
+                "title": "Clarity",
                 "description": (
-                    "问题表述是否清晰明确，无歧义。"
+                    "Check whether the issue description is clear and unambiguous."
                 ),
                 "scoring_system": "percent",
                 "score": 85,
@@ -97,7 +98,7 @@ def get_reseted_high_response() -> str:
             "items": {"type": "string"},
             "description": "Aggregated list of unique recommendations from all criteria"
         },
-        "overall_conclusion": "问题结构合理，可在当前上下文中解决，验收标准明确。"
+        "overall_conclusion": "The issue is well-structured and can be resolved in the current context with clear acceptance criteria."
     }, ensure_ascii=False, indent=2)
 
 
@@ -147,7 +148,7 @@ def get_risk_assessment_response() -> str:
             "items": {"type": "string"},
             "description": "Aggregated list of unique recommendations from all criteria"
         },
-        "overall_conclusion": "风险评估较为全面，建议进一步完善影响分析和缓解措施。"
+        "overall_conclusion": "Risk assessment is comprehensive; it is recommended to further improve impact analysis and mitigation measures."
     }, ensure_ascii=False, indent=2)
 
 
@@ -196,7 +197,7 @@ def get_task_definition_response() -> str:
             "items": {"type": "string"},
             "description": "Aggregated list of unique recommendations from all criteria"
         },
-        "overall_conclusion": "任务定义清晰，可量化验证。"
+        "overall_conclusion": "Task definition is clear and quantitatively verifiable."
     }, ensure_ascii=False, indent=2)
 
 

@@ -95,6 +95,16 @@ docker run -t -p 8501:8501 jira-analyzer:latest
 docker run -t -p 8081:8081 jira-analyzer:latest sh -c "uv run mock-jira"
 ```
 
+## Documentation
+
+For detailed technical specifications and architectural documentation, see the `docs/` directory:
+
+- `architecture.md` - System architecture and component responsibilities
+- [`prompt-template-system.md`](docs/prompt-template-system.md) - Complete guide to the flexible prompt template system, including customization examples and criteria configuration
+- `requirements_spec.md` - Project requirements and specifications
+- `design_spec.md` - Detailed design document
+- `sequence_diagram.md` - System interaction sequences
+
 ## Project Structure
 
 - `src/`
@@ -105,5 +115,7 @@ docker run -t -p 8081:8081 jira-analyzer:latest sh -c "uv run mock-jira"
       - `streamlit.py`: Streamlit web application.
       - `cli.py`: Command-line interface logic.
   - `mock_jira/`: Local Jira REST API mock for development.
+- `resources/prompts/`: Template files for AI analysis configuration.
+- `docs/`: Technical documentation and architecture guides.
 - `data/`: Sample input and output JSON files.
 - `tests/`: Quality assurance suite.

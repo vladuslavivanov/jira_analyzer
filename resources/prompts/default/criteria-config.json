@@ -1,0 +1,14 @@
+[
+  {
+    "title": "Completeness and specificity",
+    "description": "Check whether the issue contains concrete names, links, versions, API signatures, expected behavior, and enough context to act on it.",
+    "scoring_system": "percent",
+    "include_review": true
+  },
+  {
+    "title": "Measurability and acceptance criteria",
+    "description": "Check whether the issue has measurable success conditions. For a Task, look for DoD or a verifiable result. For a Risk, look for probability, impact, and a mitigation plan.",
+    "scoring_system": "percent",
+    "include_review": true
+  }
+]

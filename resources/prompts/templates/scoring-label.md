@@ -1,0 +1,1 @@
+{score_schema_label}
