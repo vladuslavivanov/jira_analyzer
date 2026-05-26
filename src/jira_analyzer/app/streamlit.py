@@ -122,6 +122,8 @@ TRANSLATIONS = {
         "no_recommendations": "No recommendations available",
         "exclude_closed": "Exclude closed tasks",
         "include_closed_tasks": "Include closed tasks",
+        "data_selection": "Data Selection",
+        "analysis_execution_settings": "Analysis Execution Settings",
         "split_by_criterion": "Analyze each criterion separately",
         "split_by_criterion_help": "When enabled, each criterion is analyzed in a separate LLM request. This provides more detailed analysis but takes longer.",
         "page_analysis": "Analysis",
@@ -233,6 +235,8 @@ TRANSLATIONS = {
         "no_recommendations": "Рекомендации отсутствуют",
         "exclude_closed": "Исключить закрытые задачи",
         "include_closed_tasks": "Включить закрытые задачи",
+        "data_selection": "Выбор данных",
+        "analysis_execution_settings": "Настройки выполнения анализа",
         "split_by_criterion": "Анализировать каждый критерий отдельно",
         "split_by_criterion_help": "При включении каждый критерий анализируется в отдельном запросе к ИИ. Это обеспечивает более детальный анализ, но занимает больше времени.",
         "page_analysis": "Анализ",
@@ -861,82 +865,96 @@ def main() -> None:
         st.caption(t("results_viewer_caption"))
         _render_results_page(t)
     else:
-        # Analysis page - Original main() implementation
-        source = st.sidebar.radio(t("issue_source"), ["Jira", "JSON"], horizontal=True)
-        worker_count = st.sidebar.number_input(
-            t("worker_count"),
-            min_value=1,
-            value=1,
-            step=1,
-        )
-        split_by_criterion = st.sidebar.checkbox(
-            t("split_by_criterion"),
-            value=False,
-            help=t("split_by_criterion_help"),
-        )
+        # Analysis page - Refactored main() implementation
+        # Main area: Complete analysis pipeline
+        # Sidebar: Advanced settings only
+        
+        # SIDEBAR: Advanced settings (keep in sidebar)
+        with st.sidebar.expander(t("connection"), expanded=False):
+            jira_server = st.text_input(
+                t("jira_server_url"),
+                value="http://127.0.0.1:8081",
+            )
+            jira_username = st.text_input(t("jira_username"))
+            jira_token = st.text_input(t("jira_token"), type="password")
+            jira_verify_ssl = st.checkbox(t("verify_ssl"), value=False)
+            jira_max_results = st.number_input(
+                t("max_results"),
+                min_value=1,
+                max_value=200,
+                value=50,
+                step=1,
+            )
 
-        _ensure_prompt_state()
-        _render_prompt_config_io(t)
-        prompt_config = _render_prompt_editor(t)
-
+        db_path = st.sidebar.text_input("Database Path", value="data/analysis.db", help="Path to SQLite database for intermediate results")
+        
+        # MAIN AREA: Complete analysis pipeline
+        
+        # Section 1: Data selection
+        st.header(t("data_selection"))
+        source = st.radio(t("issue_source"), ["Jira", "JSON"], horizontal=True)
+        
         uploaded_file = None
         use_sample = False
-        jira_server = ""
         jira_issue = ""
         jira_jql = ""
-        jira_username = ""
-        jira_token = ""
-        jira_verify_ssl = True
         jira_query_mode = "Issue key"
-        jira_max_results = 50
         exclude_closed = True
-
+        
         if source == "Jira":
-            with st.sidebar.expander(t("connection"), expanded=False):
-                jira_server = st.text_input(
-                    t("jira_server_url"),
-                    value="http://127.0.0.1:8081",
-                )
-                jira_username = st.text_input(t("jira_username"))
-                jira_token = st.text_input(t("jira_token"), type="password")
-                jira_verify_ssl = st.checkbox(t("verify_ssl"), value=False)
-
-            st.sidebar.subheader(t("query"))
-            jira_query_mode = st.sidebar.radio(
+            st.subheader(t("query"))
+            jira_query_mode = st.radio(
                 t("jira_query_mode"),
                 ["Issue key", "JQL"],
                 horizontal=True,
                 format_func=lambda value: t("issue_key") if value == "Issue key" else value,
             )
             if jira_query_mode == "Issue key":
-                jira_issue = st.sidebar.text_input(t("jira_issue_key"), value="YA-1")
+                jira_issue = st.text_input(t("jira_issue_key"), value="YA-1")
             else:
-                jira_jql = st.sidebar.text_area(
+                jira_jql = st.text_area(
                     "JQL",
                     value="project = YA",
                     height=100,
                 )
-                jira_max_results = st.sidebar.number_input(
-                    t("max_results"),
-                    min_value=1,
-                    max_value=200,
-                    value=50,
-                    step=1,
-                )
             
-            exclude_closed = st.sidebar.checkbox(
+            exclude_closed = st.checkbox(
                 t("exclude_closed"),
                 value=True,
             )
         else:
-            uploaded_file = st.sidebar.file_uploader(t("upload_jira_json"), type=["json"])
-            use_sample = st.sidebar.checkbox(
+            uploaded_file = st.file_uploader(t("upload_jira_json"), type=["json"])
+            use_sample = st.checkbox(
                 t("use_sample"),
                 value=not uploaded_file,
             )
-
-        db_path = st.sidebar.text_input("Database Path", value="data/analysis.db", help="Path to SQLite database for intermediate results")
-
+        
+        st.divider()
+        
+        # Section 2: Analysis configuration (prompt settings)
+        _ensure_prompt_state()
+        _render_prompt_config_io(t)
+        prompt_config = _render_prompt_editor(t)
+        
+        st.divider()
+        
+        # Section 3: Analysis execution settings
+        st.header(t("analysis_execution_settings"))
+        worker_count = st.number_input(
+            t("worker_count"),
+            min_value=1,
+            value=1,
+            step=1,
+        )
+        split_by_criterion = st.checkbox(
+            t("split_by_criterion"),
+            value=False,
+            help=t("split_by_criterion_help"),
+        )
+        
+        st.divider()
+        
+        # Section 4: Run analysis button
         if st.button(t("run_analysis"), type="primary"):
             st.session_state.analysis_results = None
             try:
