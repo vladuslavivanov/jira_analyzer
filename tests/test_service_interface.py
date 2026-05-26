@@ -3,9 +3,6 @@
 from __future__ import annotations
 
 import json
-
-import pytest
-
 from jira_analyzer.analyzer.service import AnalysisService
 from jira_analyzer.providers import BaseLLMProvider, LLMResponse
 

@@ -5,7 +5,7 @@ import json
 from typing import Any
 
 from jira_analyzer.analyzer.core.llm.provider import LLMProvider
-from jira_analyzer.providers import BaseLLMProvider, LLMMessage, LLMResponse
+from jira_analyzer.providers import BaseLLMProvider, FakeProvider, LLMMessage, LLMResponse
 
 
 class SyncToAsyncLLMAdapter(LLMProvider):
@@ -28,8 +28,36 @@ class SyncToAsyncLLMAdapter(LLMProvider):
         """Get the provider name from the wrapped synchronous provider."""
         return self._sync_provider.provider_name
 
-    def send_prompt(self, prompt: str, system_prompt: str | None = None) -> dict[str, Any]:
-        """Send a prompt using the synchronous provider.
+    async def send_prompt(self, prompt: str, system_prompt: str | None = None) -> dict[str, Any]:
+        """Send a prompt using the synchronous provider (async wrapper).
+        
+        Args:
+            prompt: The user prompt to send
+            system_prompt: Optional system prompt
+            
+        Returns:
+            Dictionary containing the response content or error
+        """
+        try:
+            # Run synchronous implementation in a thread pool to not block the event loop
+            loop = asyncio.get_event_loop()
+            return await loop.run_in_executor(
+                None,
+                lambda: self._sync_send_prompt(prompt, system_prompt)
+            )
+        
+        except Exception as error:
+            # Return error in format AnalysisService expects
+            return {
+                "error": str(error),
+                "provider": self._sync_provider.provider_name
+            }
+
+    def _sync_send_prompt(self, prompt: str, system_prompt: str | None = None) -> dict[str, Any]:
+        """Synchronous implementation of send_prompt.
+        
+        This method does actual work and is run in a thread pool by
+        async send_prompt method above.
         
         Args:
             prompt: The user prompt to send
@@ -72,22 +100,3 @@ class SyncToAsyncLLMAdapter(LLMProvider):
                 "error": str(error),
                 "provider": self._sync_provider.provider_name
             }
-
-    async def async_send_prompt(self, prompt: str, system_prompt: str | None = None) -> dict[str, Any]:
-        """Send a prompt asynchronously using the synchronous provider.
-        
-        This runs the synchronous call in an async wrapper.
-        
-        Args:
-            prompt: The user prompt to send  
-            system_prompt: Optional system prompt
-            
-        Returns:
-            Dictionary containing the response content or error
-        """
-        # Run synchronous call in thread pool
-        loop = asyncio.get_event_loop()
-        return await loop.run_in_executor(
-            None,
-            lambda: self.send_prompt(prompt, system_prompt)
-        )

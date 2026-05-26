@@ -8,7 +8,7 @@ LLM_PROVIDER_TYPE = os.getenv("LLM_PROVIDER_TYPE", "fake")
 LLM_API_KEY = os.getenv("LLM_API_KEY")
 LLM_BASE_URL = os.getenv("LLM_BASE_URL", "http://localhost:8000/v1")
 LLM_MODEL = os.getenv("LLM_MODEL", "default-model")
-LLM_FAKE_RESPONSE = os.getenv("LLM_FAKE_RESPONSE", "Analysis complete: test response")
+LLM_FAKE_SCENARIO = os.getenv("LLM_FAKE_SCENARIO", "default")
 
 
 def resolve_llm_config() -> dict:
@@ -16,6 +16,8 @@ def resolve_llm_config() -> dict:
     
     Returns provider configuration dictionary that can be used with ProviderFactory.
     """
+    from jira_analyzer.analyzer.core.llm.response_schema import get_response_for_scenario
+    
     provider_type = LLM_PROVIDER_TYPE
     
     if provider_type == "openai-compatible":
@@ -30,9 +32,12 @@ def resolve_llm_config() -> dict:
         }
     
     elif provider_type == "fake":
+        # Use proper LLM schema based on scenario type
+        fake_response = get_response_for_scenario(LLM_FAKE_SCENARIO)
+        
         return {
             "provider_type": provider_type,
-            "default_response": str(LLM_FAKE_RESPONSE)
+            "default_response": fake_response
         }
     
     else:
