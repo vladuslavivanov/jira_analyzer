@@ -21,9 +21,15 @@ from jira_analyzer.tasktracker.jira import (
     search_issues,
 )
 from jira_analyzer.tasktracker.jira.jira_parser import load_issues
+from jira_analyzer.ui.results_viewer import ResultsViewer
 from jira_analyzer.utils.logger import setup_logger
 
 logger = setup_logger(__name__)
+
+
+# Page names for navigation
+PAGE_ANALYSIS = "analysis"
+PAGE_RESULTS = "results"
 
 SCORING_OPTIONS = {
     "0/1": "binary",
@@ -118,6 +124,33 @@ TRANSLATIONS = {
         "include_closed_tasks": "Include closed tasks",
         "split_by_criterion": "Analyze each criterion separately",
         "split_by_criterion_help": "When enabled, each criterion is analyzed in a separate LLM request. This provides more detailed analysis but takes longer.",
+        "page_analysis": "Analysis",
+        "page_results": "Results",
+        "navigation": "Navigation",
+        "results_viewer_title": "Analysis Results",
+        "results_viewer_caption": "Browse and view detailed analysis results from SQLite database.",
+        "results_list": "Results List",
+        "search_results": "Search Results",
+        "filter_by_status": "Filter by Status",
+        "minimum_score": "Minimum Score",
+        "no_matching_results": "No results match your search criteria.",
+        "view_details": "View Details",
+        "issue_title": "{id}: {title}",
+        "result_details": "Result Details",
+        "task_id": "Task ID",
+        "status": "Status",
+        "quality_score": "Quality Score",
+        "assignee": "Assignee",
+        "created_at": "Created At",
+        "analyzed_at": "Analyzed At",
+        "issue_summary_heading": "Issue Summary",
+        "analysis_results": "Analysis Results",
+        "no_analysis_data": "No analysis data available.",
+        "score": "Score",
+        "review": "Review",
+        "results_loading_error": "Error loading results: {error}",
+        "result_not_found": "Result not found: {id}",
+        "no_analysis_results": "No analysis results found in the database. Run an analysis first."
     },
     "ru": {
         "language": "Язык",
@@ -202,9 +235,35 @@ TRANSLATIONS = {
         "include_closed_tasks": "Включить закрытые задачи",
         "split_by_criterion": "Анализировать каждый критерий отдельно",
         "split_by_criterion_help": "При включении каждый критерий анализируется в отдельном запросе к ИИ. Это обеспечивает более детальный анализ, но занимает больше времени.",
-    },
+        "page_analysis": "Анализ",
+        "page_results": "Результаты",
+        "navigation": "Навигация",
+        "results_viewer_title": "Результаты анализа",
+        "results_viewer_caption": "Просмотр детализированных результатов анализа из базы данных SQLite.",
+        "results_list": "Список результатов",
+        "search_results": "Поиск результатов",
+        "filter_by_status": "Фильтр по статусу",
+        "minimum_score": "Минимальный балл",
+        "no_matching_results": "Нет результатов, соответствующих критериям поиска.",
+        "view_details": "Просмотр деталей",
+        "issue_title": "{id}: {title}",
+        "result_details": "Детали результата",
+        "task_id": "ID задачи",
+        "status": "Статус",
+        "quality_score": "Оценка качества",
+        "assignee": "Исполнитель",
+        "created_at": "Создано",
+        "analyzed_at": "Проанализировано",
+        "issue_summary_heading": "Сводка по задаче",
+        "analysis_results": "Результаты анализа",
+        "no_analysis_data": "Нет данных анализа.",
+        "score": "Балл",
+        "review": "Рецензия",
+        "results_loading_error": "Ошибка загрузки результатов: {error}",
+        "result_not_found": "Результат не найден: {id}",
+        "no_analysis_results": "Нет результатов анализа в базе данных. Сначала выполните анализ."
+    }
 }
-
 
 def _select_language():
     language_options = {"en": "English", "ru": "Русский"}
@@ -226,7 +285,6 @@ def _select_language():
 
     return translate
 
-
 def _apply_default_scoring_system_to_criteria() -> None:
     selected_label = st.session_state.analysis_default_scoring_label
     selected_scoring = SCORING_OPTIONS[selected_label]
@@ -241,23 +299,19 @@ def _apply_default_scoring_system_to_criteria() -> None:
             _criterion_widget_key(criterion, "criterion_scoring")
         ] = selected_label
 
-
 def _set_all_criteria_scoring(criteria: list[dict], scoring_system: str) -> None:
     for criterion in criteria:
         criterion["scoring_system"] = scoring_system
-
 
 def _new_criterion_ui_id() -> str:
     next_id = int(st.session_state.get("next_criterion_ui_id", 1))
     st.session_state.next_criterion_ui_id = next_id + 1
     return f"criterion_{next_id}"
 
-
 def _ensure_criteria_ui_ids(criteria: list[dict]) -> None:
     for criterion in criteria:
         if not criterion.get("_ui_id"):
             criterion["_ui_id"] = _new_criterion_ui_id()
-
 
 def _criterion_widget_key(criterion: dict, field: str) -> str:
     ui_id = criterion.get("_ui_id")
@@ -265,7 +319,6 @@ def _criterion_widget_key(criterion: dict, field: str) -> str:
         ui_id = _new_criterion_ui_id()
         criterion["_ui_id"] = ui_id
     return f"{field}_{ui_id}"
-
 
 def _clear_criterion_widget_state() -> None:
     prefixes = (
@@ -276,9 +329,8 @@ def _clear_criterion_widget_state() -> None:
         "criterion_selected_",
     )
     for key in list(st.session_state.keys()):
-        if key.startswith(prefixes):
+        if isinstance(key, str) and key.startswith(prefixes):
             del st.session_state[key]
-
 
 def _sync_criterion_selection_from_widgets(criteria: list[dict]) -> None:
     _ensure_criteria_ui_ids(criteria)
@@ -287,7 +339,6 @@ def _sync_criterion_selection_from_widgets(criteria: list[dict]) -> None:
         if widget_key in st.session_state:
             criterion["selected"] = bool(st.session_state[widget_key])
 
-
 def _delete_selected_criteria(criteria: list[dict]) -> int:
     before_count = len(criteria)
     criteria[:] = [
@@ -295,12 +346,10 @@ def _delete_selected_criteria(criteria: list[dict]) -> int:
     ]
     return before_count - len(criteria)
 
-
 def _delete_all_criteria(criteria: list[dict]) -> int:
     deleted_count = len(criteria)
     criteria.clear()
     return deleted_count
-
 
 def _remove_criterion(index: int) -> bool:
     criteria = st.session_state.analysis_criteria
@@ -310,7 +359,6 @@ def _remove_criterion(index: int) -> bool:
     criteria.pop(index)
     _clear_criterion_widget_state()
     return True
-
 
 def _filter_criteria(criteria: list[dict], query: str) -> list[tuple[int, dict]]:
     normalized_query = query.strip().lower()
@@ -329,10 +377,8 @@ def _filter_criteria(criteria: list[dict], query: str) -> list[tuple[int, dict]]
             filtered.append((index, criterion))
     return filtered
 
-
 def _sync_criteria_search() -> None:
     st.session_state.criteria_search = st.session_state.criteria_search_input
-
 
 def _build_prompt_config_export() -> dict:
     return {
@@ -355,7 +401,6 @@ def _build_prompt_config_export() -> dict:
             for criterion in st.session_state.analysis_criteria
         ],
     }
-
 
 def _normalize_prompt_config(config: dict) -> dict:
     if not isinstance(config, dict):
@@ -395,7 +440,6 @@ def _normalize_prompt_config(config: dict) -> dict:
         "criteria": imported_criteria,
     }
 
-
 def _apply_prompt_config_to_state(config: dict) -> None:
     st.session_state.analysis_system_prompt = config["system_prompt"]
     st.session_state.analysis_general_prompt = config["general_prompt"]
@@ -412,7 +456,6 @@ def _apply_prompt_config_to_state(config: dict) -> None:
     _ensure_criteria_ui_ids(st.session_state.analysis_criteria)
     _clear_criterion_widget_state()
 
-
 def _normalize_scoring_system(value) -> str:
     if value in SCORING_LABEL_BY_VALUE:
         return value
@@ -420,134 +463,23 @@ def _normalize_scoring_system(value) -> str:
         return SCORING_OPTIONS[value]
     raise ValueError(f"Unsupported scoring system: {value}")
 
-
-def main() -> None:
-    st.set_page_config(
-        page_title="Jira AI Linter",
-        page_icon="J",
-        layout="wide",
-    )
-    t = _select_language()
-    st.title(t("title"))
-    st.caption(t("caption"))
-    source = st.sidebar.radio(t("issue_source"), ["Jira", "JSON"], horizontal=True)
-    worker_count = st.sidebar.number_input(
-        t("worker_count"),
-        min_value=1,
-        value=1,
-        step=1,
-    )
-    split_by_criterion = st.sidebar.checkbox(
-        t("split_by_criterion"),
-        value=False,
-        help=t("split_by_criterion_help"),
-    )
-
-    _ensure_prompt_state()
-    _render_prompt_config_io(t)
-    prompt_config = _render_prompt_editor(t)
-
-    uploaded_file = None
-    use_sample = False
-    jira_server = ""
-    jira_issue = ""
-    jira_jql = ""
-    jira_username = ""
-    jira_token = ""
-    jira_verify_ssl = True
-    jira_query_mode = "Issue key"
-    jira_max_results = 50
-    exclude_closed = True
-
-    if source == "Jira":
-        with st.sidebar.expander(t("connection"), expanded=False):
-            jira_server = st.text_input(
-                t("jira_server_url"),
-                value="http://127.0.0.1:8081",
-            )
-            jira_username = st.text_input(t("jira_username"))
-            jira_token = st.text_input(t("jira_token"), type="password")
-            jira_verify_ssl = st.checkbox(t("verify_ssl"), value=False)
-
-        st.sidebar.subheader(t("query"))
-        jira_query_mode = st.sidebar.radio(
-            t("jira_query_mode"),
-            ["Issue key", "JQL"],
-            horizontal=True,
-            format_func=lambda value: t("issue_key") if value == "Issue key" else value,
-        )
-        if jira_query_mode == "Issue key":
-            jira_issue = st.sidebar.text_input(t("jira_issue_key"), value="YA-1")
-        else:
-            jira_jql = st.sidebar.text_area(
-                "JQL",
-                value="project = YA",
-                height=100,
-            )
-            jira_max_results = st.sidebar.number_input(
-                t("max_results"),
-                min_value=1,
-                max_value=200,
-                value=50,
-                step=1,
-            )
-        
-        exclude_closed = st.sidebar.checkbox(
-            t("exclude_closed"),
-            value=True,
-        )
-    else:
-        uploaded_file = st.sidebar.file_uploader(t("upload_jira_json"), type=["json"])
-        use_sample = st.sidebar.checkbox(
-            t("use_sample"),
-            value=not uploaded_file,
-        )
-
-    db_path = st.sidebar.text_input("Database Path", value="data/analysis.db", help="Path to SQLite database for intermediate results")
-
-    if st.button(t("run_analysis"), type="primary"):
-        st.session_state.analysis_results = None
-        try:
-            issues = _load_issues(
-                t=t,
-                source=source,
-                uploaded_file=uploaded_file,
-                use_sample=use_sample,
-                jira_server=jira_server,
-                jira_query_mode=jira_query_mode,
-                jira_issue=jira_issue,
-                jira_jql=jira_jql,
-                jira_username=jira_username,
-                jira_token=jira_token,
-                jira_verify_ssl=jira_verify_ssl,
-                jira_max_results=int(jira_max_results),
-                exclude_closed=exclude_closed,
-            )
-            if not issues:
-                st.warning(t("no_issues"))
-                return
-
-            with st.spinner(
-                t("analyzing", count=len(issues), workers=int(worker_count))
-            ):
-                repo = SqliteAnalysisResultRepository(db_path)
-                results = run_analysis(
-                    issues,
-                    prompt_config=prompt_config,
-                    worker_count=int(worker_count),
-                    split_by_criterion=split_by_criterion,
-                    repo=repo,
-                )
-
-            st.session_state.analysis_results = results
-            st.success(t("analysis_complete"))
-        except Exception as error:
-            st.error(t("analysis_error", error=error))
-            logger.exception("UI analysis error")
-
-    if st.session_state.analysis_results:
-        _render_results(st.session_state.analysis_results, t)
-
+def _render_results_page(t) -> None:
+    """Render the results viewer page.
+    
+    Args:
+        t: Translation function.
+    
+    New page for viewing SQLite results in master-detail format.
+    """
+    db_path = st.sidebar.text_input("Database Path", value="data/analysis.db", help="Path to SQLite database for analysis results")
+    
+    try:
+        repo = SqliteAnalysisResultRepository(db_path)
+        viewer = ResultsViewer(repo, t)
+        viewer.render()
+    except Exception as error:
+        st.error(t("results_loading_error", error=error))
+        logger.exception("Results viewer error")
 
 def _render_prompt_editor(t) -> AnalysisPromptConfig:
     with st.expander(t("analysis_prompt"), expanded=True):
@@ -643,7 +575,6 @@ def _render_prompt_editor(t) -> AnalysisPromptConfig:
         include_overall_conclusion=include_overall_conclusion,
     )
 
-
 def _ensure_prompt_state() -> None:
     defaults = get_default_analysis_prompt_config()
     if "analysis_system_prompt" not in st.session_state:
@@ -684,7 +615,6 @@ def _ensure_prompt_state() -> None:
         _apply_prompt_config_to_state(st.session_state.pending_analysis_prompt_config)
         del st.session_state.pending_analysis_prompt_config
 
-
 def _render_prompt_config_io(t) -> None:
     with st.expander(t("prompt_config_io"), expanded=False):
         config_json = json.dumps(
@@ -714,7 +644,6 @@ def _render_prompt_config_io(t) -> None:
                 st.rerun()
             except Exception as error:
                 st.error(t("invalid_prompt_config", error=error))
-
 
 def _render_criterion_editor(index: int, criterion: dict, t) -> None:
     with st.container(border=True):
@@ -771,7 +700,6 @@ def _render_criterion_editor(index: int, criterion: dict, t) -> None:
                 key=_criterion_widget_key(criterion, "criterion_review"),
             )
 
-
 def _load_issues(
     *,
     t,
@@ -825,7 +753,6 @@ def _load_issues(
             raise ValueError(f"Issue {jira_issue} is closed and excluded from analysis.")
         return [issue]
 
-
 def _load_json_issues(uploaded_file, use_sample: bool, t) -> list[dict]:
     if uploaded_file is not None:
         data = json.load(uploaded_file)
@@ -842,7 +769,6 @@ def _load_json_issues(uploaded_file, use_sample: bool, t) -> list[dict]:
 
     return []
 
-
 def _extract_criterion_scores(result: dict) -> list:
     criteria = result.get("criteria")
     if isinstance(criteria, dict) and criteria:
@@ -858,7 +784,6 @@ def _extract_criterion_scores(result: dict) -> list:
         return list(scores.values())
 
     return []
-
 
 def _build_results_table(results: list[dict]) -> pd.DataFrame:
     rows = []
@@ -881,12 +806,10 @@ def _build_results_table(results: list[dict]) -> pd.DataFrame:
 
     return pd.DataFrame(rows)
 
-
 def _is_closed_status_streamlit(issue: dict) -> bool:
     status = issue.get("status", "").lower()
     closed_statuses = {"closed", "done", "resolved", "cancelled"}
     return status in closed_statuses
-
 
 def _render_results(results: list[dict], t) -> None:
     markdown_report = build_markdown_report(results)
@@ -913,9 +836,149 @@ def _render_results(results: list[dict], t) -> None:
             mime="application/json",
         )
 
-
     st.divider()
 
+def main() -> None:
+    """Main application entry point with page navigation."""
+    st.set_page_config(
+        page_title="Jira AI Linter",
+        page_icon="J",
+        layout="wide",
+    )
+    t = _select_language()
+
+    # Page navigation
+    page = st.sidebar.radio(
+        t("navigation"),
+        options=[PAGE_ANALYSIS, PAGE_RESULTS],
+        format_func=lambda x: t(f"page_{x}"),
+        horizontal=True,
+    )
+
+    # Route to appropriate page
+    if page == PAGE_RESULTS:
+        st.title(t("results_viewer_title"))
+        st.caption(t("results_viewer_caption"))
+        _render_results_page(t)
+    else:
+        # Analysis page - Original main() implementation
+        source = st.sidebar.radio(t("issue_source"), ["Jira", "JSON"], horizontal=True)
+        worker_count = st.sidebar.number_input(
+            t("worker_count"),
+            min_value=1,
+            value=1,
+            step=1,
+        )
+        split_by_criterion = st.sidebar.checkbox(
+            t("split_by_criterion"),
+            value=False,
+            help=t("split_by_criterion_help"),
+        )
+
+        _ensure_prompt_state()
+        _render_prompt_config_io(t)
+        prompt_config = _render_prompt_editor(t)
+
+        uploaded_file = None
+        use_sample = False
+        jira_server = ""
+        jira_issue = ""
+        jira_jql = ""
+        jira_username = ""
+        jira_token = ""
+        jira_verify_ssl = True
+        jira_query_mode = "Issue key"
+        jira_max_results = 50
+        exclude_closed = True
+
+        if source == "Jira":
+            with st.sidebar.expander(t("connection"), expanded=False):
+                jira_server = st.text_input(
+                    t("jira_server_url"),
+                    value="http://127.0.0.1:8081",
+                )
+                jira_username = st.text_input(t("jira_username"))
+                jira_token = st.text_input(t("jira_token"), type="password")
+                jira_verify_ssl = st.checkbox(t("verify_ssl"), value=False)
+
+            st.sidebar.subheader(t("query"))
+            jira_query_mode = st.sidebar.radio(
+                t("jira_query_mode"),
+                ["Issue key", "JQL"],
+                horizontal=True,
+                format_func=lambda value: t("issue_key") if value == "Issue key" else value,
+            )
+            if jira_query_mode == "Issue key":
+                jira_issue = st.sidebar.text_input(t("jira_issue_key"), value="YA-1")
+            else:
+                jira_jql = st.sidebar.text_area(
+                    "JQL",
+                    value="project = YA",
+                    height=100,
+                )
+                jira_max_results = st.sidebar.number_input(
+                    t("max_results"),
+                    min_value=1,
+                    max_value=200,
+                    value=50,
+                    step=1,
+                )
+            
+            exclude_closed = st.sidebar.checkbox(
+                t("exclude_closed"),
+                value=True,
+            )
+        else:
+            uploaded_file = st.sidebar.file_uploader(t("upload_jira_json"), type=["json"])
+            use_sample = st.sidebar.checkbox(
+                t("use_sample"),
+                value=not uploaded_file,
+            )
+
+        db_path = st.sidebar.text_input("Database Path", value="data/analysis.db", help="Path to SQLite database for intermediate results")
+
+        if st.button(t("run_analysis"), type="primary"):
+            st.session_state.analysis_results = None
+            try:
+                issues = _load_issues(
+                    t=t,
+                    source=source,
+                    uploaded_file=uploaded_file,
+                    use_sample=use_sample,
+                    jira_server=jira_server,
+                    jira_query_mode=jira_query_mode,
+                    jira_issue=jira_issue,
+                    jira_jql=jira_jql,
+                    jira_username=jira_username,
+                    jira_token=jira_token,
+                    jira_verify_ssl=jira_verify_ssl,
+                    jira_max_results=int(jira_max_results),
+                    exclude_closed=exclude_closed,
+                )
+                if not issues:
+                    st.warning(t("no_issues"))
+                    return
+
+                with st.spinner(
+                    t("analyzing", count=len(issues), workers=int(worker_count))
+                ):
+                    repo = SqliteAnalysisResultRepository(db_path)
+                    results = run_analysis(
+                        issues,
+                        prompt_config=prompt_config,
+                        worker_count=int(worker_count),
+                        split_by_criterion=split_by_criterion,
+                        repo=repo,
+                    )
+
+                st.session_state.analysis_results = results
+                st.success(t("analysis_complete"))
+            except Exception as error:
+                st.error(t("analysis_error", error=error))
+                logger.exception("UI analysis error")
+
+        if st.session_state.analysis_results:
+            _render_results(st.session_state.analysis_results, t)
 
 if __name__ == "__main__":
     main()
