@@ -5,6 +5,8 @@ from typing import Optional
 from openai import OpenAI
 
 from jira_analyzer.providers.base import BaseLLMProvider, LLMMessage, LLMResponse
+from jira_analyzer.utils.logger import setup_logger
+from jira_analyzer.utils.config import LOG_LLM_PROMPTS
 
 
 class OpenAICompatibleProvider(BaseLLMProvider):
@@ -12,7 +14,7 @@ class OpenAICompatibleProvider(BaseLLMProvider):
 
     Simple implementation - no complex retry logic or error handling.
     """
-
+    
     def __init__(
         self,
         api_key: str,
@@ -31,6 +33,7 @@ class OpenAICompatibleProvider(BaseLLMProvider):
             base_url=base_url
         )
         self._model = model
+        self._logger = setup_logger(__name__)
 
     @property
     def provider_name(self) -> str:
@@ -47,6 +50,12 @@ class OpenAICompatibleProvider(BaseLLMProvider):
         Returns:
             LLMResponse with content and metadata
         """
+        # Log request if enabled
+        if LOG_LLM_PROMPTS:
+            self._logger.info("=== LLM Request ===")
+            for msg in messages:
+                self._logger.info(f"{msg.role}: {msg.content}")
+
         # Convert messages to OpenAI format
         openai_messages = [
             {"role": str(msg.role), "content": str(msg.content)}
@@ -61,9 +70,21 @@ class OpenAICompatibleProvider(BaseLLMProvider):
             max_tokens=max_tokens
         )
 
+        # Extract response content
+        content = response.choices[0].message.content or ""
+        
+        # Log response if enabled
+        if LOG_LLM_PROMPTS:
+            self._logger.info("=== LLM Response ===")
+            if response.choices:
+                self._logger.info(f"Finish reason: {response.choices[0].finish_reason}")
+            if response.usage:
+                self._logger.info(f"Tokens used: {response.usage.total_tokens} (prompt: {response.usage.prompt_tokens}, completion: {response.usage.completion_tokens})")
+            self._logger.info(f"Content: {content}")
+
         # Return response
         return LLMResponse(
-            content=response.choices[0].message.content or "",
+            content=content,
             model=response.model,
             tokens_used=response.usage.total_tokens if response.usage else None
         )

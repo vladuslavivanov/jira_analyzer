@@ -10,6 +10,9 @@ LLM_BASE_URL = os.getenv("LLM_BASE_URL", "http://localhost:8000/v1")
 LLM_MODEL = os.getenv("LLM_MODEL", "default-model")
 LLM_FAKE_SCENARIO = os.getenv("LLM_FAKE_SCENARIO", "default")
 
+# LLM debugging settings
+LOG_LLM_PROMPTS = os.getenv("LOG_LLM_PROMPTS", "false").lower() == "true"
+
 
 def resolve_llm_config() -> dict:
     """Resolve LLM configuration from environment variables.
