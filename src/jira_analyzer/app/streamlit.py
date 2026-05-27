@@ -626,28 +626,35 @@ def _render_prompt_config_io(t) -> None:
             ensure_ascii=False,
             indent=2,
         )
-        st.download_button(
-            t("export_prompt_config"),
-            data=config_json,
-            file_name="analysis_prompt_config.json",
-            mime="application/json",
-        )
-
+        
         uploaded_config = st.file_uploader(
             t("prompt_config_file"),
             type=["json"],
             key="analysis_prompt_config_upload",
         )
-        if st.button(t("import_prompt_config"), disabled=uploaded_config is None):
-            try:
-                if uploaded_config is None:
-                    return
-                st.session_state.pending_analysis_prompt_config = (
-                    _normalize_prompt_config(json.load(uploaded_config))
-                )
-                st.rerun()
-            except Exception as error:
-                st.error(t("invalid_prompt_config", error=error))
+
+        btn_cols = st.columns(2)
+        with btn_cols[0]:
+            if st.button(t("import_prompt_config"), disabled=uploaded_config is None, use_container_width=True):
+                try:
+                    if uploaded_config is None:
+                        return
+                    st.session_state.pending_analysis_prompt_config = (
+                        _normalize_prompt_config(json.load(uploaded_config))
+                    )
+                    st.rerun()
+                except Exception as error:
+                    st.error(t("invalid_prompt_config", error=error))
+
+        with btn_cols[1]:
+            st.download_button(
+                t("export_prompt_config"),
+                data=config_json,
+                file_name="analysis_prompt_config.json",
+                mime="application/json",
+                use_container_width=True,
+            )
+
 
 def _render_criterion_editor(index: int, criterion: dict, t) -> None:
     with st.container(border=True):
