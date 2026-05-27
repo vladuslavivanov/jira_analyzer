@@ -25,10 +25,15 @@ class ResultsViewer:
         self.repository = repository
         self.t = translate_func
 
-    def render(self) -> None:
-        """Render the master-detail results viewer interface."""
-        # Initialize session state properly
-        if "all_results" not in st.session_state:
+    def render(self, force_reload: bool = False) -> None:
+        """Render the master-detail results viewer interface.
+
+        Args:
+            force_reload: If True, force reload results from database.
+                          Otherwise, use cached results if available.
+        """
+        # Load results: force reload when entering the page, otherwise use cache
+        if force_reload or "all_results" not in st.session_state:
             st.session_state.all_results = self._load_results()
 
         # Initialize selected result ID if not set

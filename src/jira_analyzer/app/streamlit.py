@@ -463,11 +463,12 @@ def _normalize_scoring_system(value) -> str:
         return SCORING_OPTIONS[value]
     raise ValueError(f"Unsupported scoring system: {value}")
 
-def _render_results_page(t) -> None:
+def _render_results_page(t, force_reload: bool = False) -> None:
     """Render the results viewer page.
 
     Args:
         t: Translation function.
+        force_reload: Whether to force reload results from database.
 
     New page for viewing SQLite results in master-detail format.
     """
@@ -476,7 +477,7 @@ def _render_results_page(t) -> None:
     try:
         repo = SqliteAnalysisResultRepository(db_path)
         viewer = ResultsViewer(repo, t)
-        viewer.render()
+        viewer.render(force_reload=force_reload)
     except Exception as error:
         st.error(t("results_loading_error", error=error))
         logger.exception("Results viewer error")
@@ -867,11 +868,16 @@ def main() -> None:
         horizontal=True,
     )
 
+    # Track page transitions for results reload
+    previous_page = st.session_state.get("previous_page")
+    is_entering_results_page = page == PAGE_RESULTS and previous_page != PAGE_RESULTS
+    st.session_state.previous_page = page
+
     # Route to appropriate page
     if page == PAGE_RESULTS:
         st.title(t("results_viewer_title"))
         st.caption(t("results_viewer_caption"))
-        _render_results_page(t)
+        _render_results_page(t, force_reload=is_entering_results_page)
     else:
         # Analysis page - Refactored main() implementation
         # Main area: Complete analysis pipeline
