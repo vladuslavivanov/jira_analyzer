@@ -2,12 +2,9 @@
 
 from __future__ import annotations
 
-import sys
 import time
 
-import pytest
 
-from jira_analyzer.analyzer.engine import run_analysis
 
 
 def test_run_analysis_processes_issues_with_multiple_workers():

@@ -5,7 +5,7 @@ import json
 from typing import Any
 
 from jira_analyzer.analyzer.core.llm.provider import LLMProvider
-from jira_analyzer.providers import BaseLLMProvider, FakeProvider, LLMMessage, LLMResponse
+from jira_analyzer.providers import BaseLLMProvider, LLMMessage, LLMResponse
 
 
 class SyncToAsyncLLMAdapter(LLMProvider):
