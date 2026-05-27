@@ -464,16 +464,16 @@ def _normalize_scoring_system(value) -> str:
         return SCORING_OPTIONS[value]
     raise ValueError(f"Unsupported scoring system: {value}")
 
-def _render_results_page(t, force_reload: bool = False) -> None:
+def _render_results_page(t, db_path: str, force_reload: bool = False) -> None:
     """Render the results viewer page.
 
     Args:
         t: Translation function.
+        db_path: Path to SQLite database for analysis results.
         force_reload: Whether to force reload results from database.
 
     New page for viewing SQLite results in master-detail format.
     """
-    db_path = st.sidebar.text_input("Database Path", value="data/analysis.db", help="Path to SQLite database for analysis results")
 
     try:
         repo = SqliteAnalysisResultRepository(db_path)
@@ -852,6 +852,159 @@ def _render_results(results: list[dict], t) -> None:
 
     st.divider()
 
+def _render_analysis_page(
+    t, 
+    jira_server, 
+    jira_username, 
+    jira_token, 
+    jira_verify_ssl, 
+    jira_max_results, 
+    db_path
+) -> None:
+    """Render the analysis page with data selection, configuration, and execution."""
+    # Section 1: Data selection
+    st.header(t("data_selection"))
+    source = st.radio(t("issue_source"), ["Jira", "JSON"], horizontal=True)
+
+    uploaded_file = None
+    use_sample = False
+    jira_issue = ""
+    jira_jql = ""
+    jira_query_mode = "Issue key"
+    exclude_closed = True
+
+    if source == "Jira":
+        st.subheader(t("query"))
+        jira_query_mode = st.radio(
+            t("jira_query_mode"),
+            ["Issue key", "JQL"],
+            horizontal=True,
+            format_func=lambda value: t("issue_key") if value == "Issue key" else value,
+        )
+        if jira_query_mode == "Issue key":
+            jira_issue = st.text_input(t("jira_issue_key"), value="YA-1")
+        else:
+            jira_jql = st.text_area(
+                "JQL",
+                value="project = YA",
+                height=100,
+            )
+
+        exclude_closed = st.checkbox(
+            t("exclude_closed"),
+            value=True,
+        )
+    else:
+        uploaded_file = st.file_uploader(t("upload_jira_json"), type=["json"])
+        use_sample = st.checkbox(
+            t("use_sample"),
+            value=not uploaded_file,
+        )
+
+    st.divider()
+
+    # Section 2: Analysis configuration (prompt settings)
+    _ensure_prompt_state()
+    prompt_config = _render_prompt_editor(t)
+
+    st.divider()
+
+    # Section 3: Analysis execution settings
+    st.header(t("analysis_execution_settings"))
+    worker_count = st.slider(
+        t("worker_count"),
+        min_value=1,
+        max_value=10,
+        value=4,
+        step=1,
+    )
+    split_by_criterion = st.checkbox(
+        t("split_by_criterion"),
+        value=False,
+        help=t("split_by_criterion_help"),
+    )
+    
+    # LLM reasoning mode settings
+    reasoning_enabled = st.checkbox(
+        "Enable LLM Reasoning Mode",
+        value=False,
+        help="Enable DeepSeek reasoning mode for improved analysis quality (may increase response time)"
+    )
+    
+    reasoning_effort = None
+    if reasoning_enabled:
+        reasoning_effort = st.selectbox(
+            "Reasoning Effort Level",
+            options=["high", "max"],
+            index=0,
+            help="Level of reasoning effort: 'high' for balanced performance, 'max' for best results (slower)"
+        )
+
+    st.divider()
+
+    # Section 4: Run analysis button
+    if st.button(t("run_analysis"), type="primary"):
+        st.session_state.analysis_results = None
+        try:
+            issues = _load_issues(
+                t=t,
+                source=source,
+                uploaded_file=uploaded_file,
+                use_sample=use_sample,
+                jira_server=jira_server,
+                jira_query_mode=jira_query_mode,
+                jira_issue=jira_issue,
+                jira_jql=jira_jql,
+                jira_username=jira_username,
+                jira_token=jira_token,
+                jira_verify_ssl=jira_verify_ssl,
+                jira_max_results=int(jira_max_results),
+                exclude_closed=exclude_closed,
+            )
+            if not issues:
+                st.warning(t("no_issues"))
+                return
+
+            with st.spinner(
+                t("analyzing", count=len(issues), workers=int(worker_count))
+            ):
+                repo = SqliteAnalysisResultRepository(db_path)
+                
+                # Create a meaningful run name based on analysis type
+                if source == "Jira":
+                    if jira_query_mode == "Issue key":
+                        run_name = f"Issue Analysis: {jira_issue}"
+                    else:
+                        run_name = f"JQL Analysis: {jira_jql[:50]}..."
+                else:
+                    run_name = "JSON Dataset Analysis"
+                
+                # Create analysis service first to get run_id
+                service = AnalysisService(
+                    prompt_config=prompt_config,
+                    worker_count=int(worker_count),
+                    split_by_criterion=split_by_criterion,
+                    repo=repo,
+                    reasoning_enabled=reasoning_enabled,
+                    reasoning_effort=reasoning_effort,
+                )
+                
+                # Create analysis run and get run_id
+                run_id = service.create_analysis_run(run_name=run_name)
+                st.session_state.current_run_id = run_id
+                
+                # Perform analysis using the service with run_id
+                results = service.analyze_issues(issues)
+
+            st.session_state.analysis_results = results
+            st.success(t("analysis_complete"))
+        except Exception as error:
+            st.error(t("analysis_error", error=error))
+            logger.exception("UI analysis error")
+
+    if st.session_state.analysis_results:
+        _render_results(st.session_state.analysis_results, t)
+
 def main() -> None:
     """Main application entry point with page navigation."""
     st.set_page_config(
@@ -861,192 +1014,42 @@ def main() -> None:
     )
     t = _select_language()
 
-    # Page navigation
-    page = st.sidebar.radio(
-        t("navigation"),
-        options=[PAGE_ANALYSIS, PAGE_RESULTS],
-        format_func=lambda x: t(f"page_{x}"),
-        horizontal=True,
-    )
-
-    # Track page transitions for results reload
-    previous_page = st.session_state.get("previous_page")
-    is_entering_results_page = page == PAGE_RESULTS and previous_page != PAGE_RESULTS
-    st.session_state.previous_page = page
-
-    # Route to appropriate page
-    if page == PAGE_RESULTS:
-        st.title(t("results_viewer_title"))
-        st.caption(t("results_viewer_caption"))
-        _render_results_page(t, force_reload=is_entering_results_page)
-    else:
-        # Analysis page - Refactored main() implementation
-        # Main area: Complete analysis pipeline
-        # Sidebar: Advanced settings only
-
-        # SIDEBAR: Advanced settings (keep in sidebar)
-        with st.sidebar.expander(t("connection"), expanded=False):
-            jira_server = st.text_input(
-                t("jira_server_url"),
-                value="http://127.0.0.1:8081",
-            )
-            jira_username = st.text_input(t("jira_username"))
-            jira_token = st.text_input(t("jira_token"), type="password")
-            jira_verify_ssl = st.checkbox(t("verify_ssl"), value=False)
-            jira_max_results = st.number_input(
-                t("max_results"),
-                min_value=1,
-                max_value=200,
-                value=50,
-                step=1,
-            )
-
-        db_path = st.sidebar.text_input("Database Path", value="data/analysis.db", help="Path to SQLite database for intermediate results")
-
-        # MAIN AREA: Complete analysis pipeline
-
-        # Section 1: Data selection
-        st.header(t("data_selection"))
-        source = st.radio(t("issue_source"), ["Jira", "JSON"], horizontal=True)
-
-        uploaded_file = None
-        use_sample = False
-        jira_issue = ""
-        jira_jql = ""
-        jira_query_mode = "Issue key"
-        exclude_closed = True
-
-        if source == "Jira":
-            st.subheader(t("query"))
-            jira_query_mode = st.radio(
-                t("jira_query_mode"),
-                ["Issue key", "JQL"],
-                horizontal=True,
-                format_func=lambda value: t("issue_key") if value == "Issue key" else value,
-            )
-            if jira_query_mode == "Issue key":
-                jira_issue = st.text_input(t("jira_issue_key"), value="YA-1")
-            else:
-                jira_jql = st.text_area(
-                    "JQL",
-                    value="project = YA",
-                    height=100,
-                )
-
-            exclude_closed = st.checkbox(
-                t("exclude_closed"),
-                value=True,
-            )
-        else:
-            uploaded_file = st.file_uploader(t("upload_jira_json"), type=["json"])
-            use_sample = st.checkbox(
-                t("use_sample"),
-                value=not uploaded_file,
-            )
-
-        st.divider()
-
-        # Section 2: Analysis configuration (prompt settings)
-        _ensure_prompt_state()
-        prompt_config = _render_prompt_editor(t)
-
-        st.divider()
-
-        # Section 3: Analysis execution settings
-        st.header(t("analysis_execution_settings"))
-        worker_count = st.slider(
-            t("worker_count"),
+    # SIDEBAR: Advanced settings (keep in sidebar)
+    with st.sidebar.expander(t("connection"), expanded=False):
+        jira_server = st.text_input(
+            t("jira_server_url"),
+            value="http://127.0.0.1:8081",
+        )
+        jira_username = st.text_input(t("jira_username"))
+        jira_token = st.text_input(t("jira_token"), type="password")
+        jira_verify_ssl = st.checkbox(t("verify_ssl"), value=False)
+        jira_max_results = st.number_input(
+            t("max_results"),
             min_value=1,
-            max_value=10,
-            value=4,
+            max_value=200,
+            value=50,
             step=1,
         )
-        split_by_criterion = st.checkbox(
-            t("split_by_criterion"),
-            value=False,
-            help=t("split_by_criterion_help"),
-        )
+
+    db_path = st.sidebar.text_input("Database Path", value="data/analysis.db", help="Path to SQLite database for intermediate results")
+
+    # Page navigation using tabs
+    tabs = st.tabs([t("page_analysis"), t("page_results")])
+
+    with tabs[0]:  # Analysis page
+        # Track page transitions
+        st.session_state.previous_page = PAGE_ANALYSIS
+        _render_analysis_page(t, jira_server, jira_username, jira_token, jira_verify_ssl, jira_max_results, db_path)
+
+    with tabs[1]:  # Results page
+        # Track page transitions for results reload
+        previous_page = st.session_state.get("previous_page")
+        is_entering_results_page = previous_page != PAGE_RESULTS
+        st.session_state.previous_page = PAGE_RESULTS
         
-        # LLM reasoning mode settings
-        reasoning_enabled = st.checkbox(
-            "Enable LLM Reasoning Mode",
-            value=False,
-            help="Enable DeepSeek reasoning mode for improved analysis quality (may increase response time)"
-        )
-        
-        reasoning_effort = None
-        if reasoning_enabled:
-            reasoning_effort = st.selectbox(
-                "Reasoning Effort Level",
-                options=["high", "max"],
-                index=0,
-                help="Level of reasoning effort: 'high' for balanced performance, 'max' for best results (slower)"
-            )
-
-        st.divider()
-
-        # Section 4: Run analysis button
-        if st.button(t("run_analysis"), type="primary"):
-            st.session_state.analysis_results = None
-            try:
-                issues = _load_issues(
-                    t=t,
-                    source=source,
-                    uploaded_file=uploaded_file,
-                    use_sample=use_sample,
-                    jira_server=jira_server,
-                    jira_query_mode=jira_query_mode,
-                    jira_issue=jira_issue,
-                    jira_jql=jira_jql,
-                    jira_username=jira_username,
-                    jira_token=jira_token,
-                    jira_verify_ssl=jira_verify_ssl,
-                    jira_max_results=int(jira_max_results),
-                    exclude_closed=exclude_closed,
-                )
-                if not issues:
-                    st.warning(t("no_issues"))
-                    return
-
-                with st.spinner(
-                    t("analyzing", count=len(issues), workers=int(worker_count))
-                ):
-                    repo = SqliteAnalysisResultRepository(db_path)
-                    
-                    # Create a meaningful run name based on analysis type
-                    if source == "Jira":
-                        if jira_query_mode == "Issue key":
-                            run_name = f"Issue Analysis: {jira_issue}"
-                        else:
-                            run_name = f"JQL Analysis: {jira_jql[:50]}..."
-                    else:
-                        run_name = "JSON Dataset Analysis"
-                    
-                    # Create analysis service first to get run_id
-                    service = AnalysisService(
-                        prompt_config=prompt_config,
-                        worker_count=int(worker_count),
-                        split_by_criterion=split_by_criterion,
-                        repo=repo,
-                        reasoning_enabled=reasoning_enabled,
-                        reasoning_effort=reasoning_effort,
-                    )
-                    
-                    # Create analysis run and get run_id
-                    run_id = service.create_analysis_run(run_name=run_name)
-                    st.session_state.current_run_id = run_id
-                    
-                    # Perform analysis using the service with run_id
-                    results = service.analyze_issues(issues)
-
-                st.session_state.analysis_results = results
-                st.success(t("analysis_complete"))
-            except Exception as error:
-                st.error(t("analysis_error", error=error))
-                logger.exception("UI analysis error")
-
-        if st.session_state.analysis_results:
-            _render_results(st.session_state.analysis_results, t)
+        st.title(t("results_viewer_title"))
+        st.caption(t("results_viewer_caption"))
+        _render_results_page(t, db_path, force_reload=is_entering_results_page)
 
 if __name__ == "__main__":
     main()
