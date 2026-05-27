@@ -27,9 +27,6 @@ class ResultsViewer:
 
     def render(self) -> None:
         """Render the master-detail results viewer interface."""
-        st.title(self.t("results_viewer_title"))
-        st.caption(self.t("results_viewer_caption"))
-
         # Initialize session state properly
         if "all_results" not in st.session_state:
             st.session_state.all_results = self._load_results()
@@ -367,22 +364,16 @@ class ResultsViewer:
 
         # Criteria scores - Table formatted display
         criteria_scores = analysis.get("criteria_scores", {})
+        criteria_full = analysis.get("criteria", {})
         if criteria_scores:
             st.subheader("📈 Criteria Breakdown")
-            self._display_criteria_scores_table(result, criteria_scores)
+            self._display_criteria_scores_table(result, criteria_scores, criteria_full)
         else:
             # Legacy format: check for 'criteria' field
             criteria = analysis.get("criteria", {})
             if criteria:
                 st.subheader("📈 Criteria Breakdown")
                 self._display_legacy_criteria_table(criteria)
-
-        # Recommendations
-        recommendations = analysis.get("recommendations", [])
-        if recommendations:
-            st.subheader("💡 Recommendations")
-            for i, recommendation in enumerate(recommendations, 1):
-                st.markdown(f"{i}. {recommendation}")
                 
         # Analysis Run Configuration (under cut)
         run_id = result.get("run_id")
@@ -407,64 +398,85 @@ class ResultsViewer:
         except Exception:
             return {}
 
-    def _display_criteria_scores_table(self, result: Dict[str, Any], criteria_scores: Dict[str, Any]) -> None:
-        """Display criteria scores in a table format.
+    def _display_criteria_scores_table(self, result: Dict[str, Any], criteria_scores: Dict[str, Any], criteria: Dict[str, Any] = None) -> None:
+        """Display criteria scores in individual expandable sections.
+
+        Each criterion is shown in its own expandable section with the criterion name
+        and score in the title. Inside each section, the score system, fix recommendations,
+        and review text are displayed.
 
         Args:
             result: Result dictionary containing run_id.
-            criteria_scores: Dictionary of criteria with scores and reviews.
+            criteria_scores: Dictionary of criteria with scores.
+            criteria: Dictionary of full criteria with recommendations and details.
         """
+        if criteria is None:
+            criteria = {}
+        
         run_id = result.get("run_id")
         criteria_definitions = self._get_criteria_definitions(run_id) if run_id else {}
         
-        # Prepare data for table
-        table_data = []
-        for criterion_name, criterion_data in criteria_scores.items():
-            # Get the criteria definition for this criterion
+        # Display each criterion in its own expandable section
+        for criterion_name, criterion_score in criteria_scores.items():
+            # Get criteria definition for display title
             criterion_def = criteria_definitions.get(criterion_name)
+            # Get full criteria data
+            criterion_data = criteria.get(criterion_name, {})
+            if not isinstance(criterion_data, dict):
+                criterion_data = {}
+                    
+            display_title = criterion_def.get("title") if criterion_def else criterion_data.get("title", criterion_name)
             
-            # Get display title
-            if criterion_def and criterion_def.get("title"):
-                display_title = criterion_def.get("title")
+            # Get scoring system - prioritize from full criteria data, then from definitions
+            if criterion_data.get("scoring_system"):
+                scoring_system = criterion_data.get("scoring_system")
+            elif criterion_def and criterion_def.get("scoring_system"):
+                scoring_system = criterion_def.get("scoring_system")
             else:
-                display_title = criterion_name
-            
-            # Get scoring system
-            scoring_system = criterion_def.get("scoring_system", "percent") if criterion_def else "N/A"
+                scoring_system = "N/A"
             
             # Get score
-            if isinstance(criterion_data, dict):
-                score = criterion_data.get("score")
-                review = criterion_data.get("review", "")
+            if isinstance(criterion_score, dict):
+                score = criterion_score.get("score")
+                review = criterion_score.get("review", criterion_data.get("review", ""))
             else:
-                score = criterion_data if isinstance(criterion_data, (int, float)) else None
-                review = ""
+                score = criterion_score if isinstance(criterion_score, (int, float)) else None
+                review = criterion_data.get("review", "")
             
-            # Format score display
-            score_display = f"{score:.1f}/10" if score is not None else "N/A"
+            # Format score display based on scoring system
+            if score is not None:
+                if scoring_system == "percent":
+                    score_display = f"{score:.0f}%" if float(score).is_integer() else f"{score:.1f}%"
+                elif scoring_system == "five":
+                    score_display = f"{score:.0f}/5" if float(score).is_integer() else f"{score:.1f}/5"
+                elif scoring_system == "binary":
+                    score_display = f"{score:.0f}" if float(score).is_integer() else f"{score:.1f}"
+                else:
+                    # Default fallback
+                    score_display = f"{score:.0f}/10" if float(score).is_integer() else f"{score:.1f}/10"
+            else:
+                score_display = "N/A"
             
-            table_data.append({
-                "Criterion Name": display_title,
-                "Score": score_display,
-                "Score System": scoring_system,
-                "Review": review[:100] + "..." if len(str(review)) > 100 else review,
-            })
-        
-        # Display table
-        if table_data:
-            df = pd.DataFrame(table_data)
-            st.dataframe(df, width="stretch", hide_index=True)
+            # Get fix recommendations
+            recommendations = criterion_data.get("recommendations", [])
             
-            # Show detailed reviews in expandable sections
-            for criterion_name, criterion_data in criteria_scores.items():
-                criterion_def = criteria_definitions.get(criterion_name)
-                display_title = criterion_def.get("title") if criterion_def else criterion_name
+            # Create expandable section with criterion name and score in title
+            expander_title = f"📊 {display_title} - Score: {score_display}"
+            
+            with st.expander(expander_title, expanded=False):
+                # Display score system
+                st.markdown(f"**📈 Score System:** {scoring_system}")
                 
-                if isinstance(criterion_data, dict):
-                    review = criterion_data.get("review", "")
-                    if review:
-                        with st.expander(f"📝 Review for: {display_title}", expanded=False):
-                            st.markdown(review)
+                # Display fix recommendations
+                if recommendations and isinstance(recommendations, list):
+                    st.markdown("**🔧 Fix Recommendations:**")
+                    for i, rec in enumerate(recommendations, 1):
+                        st.markdown(f"  {i}. {rec}")
+                
+                # Display review
+                if review:
+                    st.markdown("**📝 Review:**")
+                    st.markdown(review)
     
     def _display_legacy_criteria_table(self, criteria: Dict[str, Any]) -> None:
         """Display criteria in legacy format using table.
