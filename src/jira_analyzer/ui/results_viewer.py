@@ -73,7 +73,7 @@ class ResultsViewer:
                     # Ensure required fields exist with defensive defaults
                     validated_result = {
                         "task_id": result.get("task_id", "Unknown"),
-                        "title": result.get("title", "No title"),
+                        "title": result.get("title") or "No title",
                         "state": result.get("state", "UNKNOWN"),
                         "description": result.get("description", ""),
                         "total_score": result.get("total_score"),
@@ -145,35 +145,26 @@ class ResultsViewer:
             st.warning(self.t("no_matching_results"))
             return
 
-        # Display results as selectable items
+        # Display results as selectable items (not spoilers/expanders)
         for result in filtered_results:
             task_id = result.get("task_id", "Unknown")
             title = result.get("title", "No title")
             score = result.get("total_score")
-            score_display = f"{score:.1f}/10" if score is not None else "N/A"
+            score_display = f"{score:.1f}/10" if score is not None else "N/A"  
 
-            # Create expandable card for each result
-            with st.expander(
-                f"{self.t('issue_title', id=task_id, title=title)}",
-                expanded=(task_id == st.session_state.selected_result_id),
+            # Create clickable card for each result
+            is_selected = task_id == st.session_state.selected_result_id
+            card_color = "primary" if is_selected else "secondary"
+            
+            # Use button to select the result (simple direct interaction)
+            if st.button(
+                f"{self.t('issue_title', id=task_id, title=title)} | {score_display}",
+                key=f"select_{task_id}",
+                use_container_width=True,
+                type=card_color,
             ):
-                # Basic info
-                col_info1, col_info2 = st.columns(2)
-                with col_info1:
-                    st.caption(self.t("task_id"))
-                    st.text(task_id)
-                with col_info2:
-                    st.caption(self.t("quality_score"))
-                    st.text(score_display)
-
-                # Select button
-                if st.button(
-                    self.t("view_details"),
-                    key=f"select_{task_id}",
-                    use_container_width=True,
-                ):
-                    st.session_state.selected_result_id = task_id
-                    st.rerun()
+                st.session_state.selected_result_id = task_id
+                st.rerun()
 
     def _filter_results(
         self,
