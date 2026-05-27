@@ -469,14 +469,14 @@ def _normalize_scoring_system(value) -> str:
 
 def _render_results_page(t) -> None:
     """Render the results viewer page.
-    
+
     Args:
         t: Translation function.
-    
+
     New page for viewing SQLite results in master-detail format.
     """
     db_path = st.sidebar.text_input("Database Path", value="data/analysis.db", help="Path to SQLite database for analysis results")
-    
+
     try:
         repo = SqliteAnalysisResultRepository(db_path)
         viewer = ResultsViewer(repo, t)
@@ -487,6 +487,42 @@ def _render_results_page(t) -> None:
 
 def _render_prompt_editor(t) -> AnalysisPromptConfig:
     with st.expander(t("analysis_prompt"), expanded=True):
+        # Integrated Import/Export configuration controls
+        st.subheader(t("prompt_config_io"))
+        config_json = json.dumps(
+            _build_prompt_config_export(),
+            ensure_ascii=False,
+            indent=2,
+        )
+        uploaded_config = st.file_uploader(
+            t("prompt_config_file"),
+            type=["json"],
+            key="analysis_prompt_config_upload",
+        )
+        btn_cols = st.columns(2)
+        with btn_cols[0]:
+            if st.button(t("import_prompt_config"), disabled=uploaded_config is None, use_container_width=True):
+                try:
+                    if uploaded_config is not None:
+                        st.session_state.pending_analysis_prompt_config = (
+                            _normalize_prompt_config(json.load(uploaded_config))
+                        )
+                        st.rerun()
+                except Exception as error:
+                    st.error(t("invalid_prompt_config", error=error))
+        with btn_cols[1]:
+            st.download_button(
+                t("export_prompt_config"),
+                data=config_json,
+                file_name="analysis_prompt_config.json",
+                mime="application/json",
+                use_container_width=True,
+            )
+
+        st.divider()
+        
+        st.subheader(t("analysis_prompt"))
+        
         st.caption(t("prompt_caption"))
         system_prompt = st.text_area(
             t("system_prompt"),
@@ -517,28 +553,6 @@ def _render_prompt_editor(t) -> AnalysisPromptConfig:
         )
 
         _sync_criterion_selection_from_widgets(st.session_state.analysis_criteria)
-        action_cols = st.columns([1, 1, 4])
-        selected_count = sum(
-            1
-            for criterion in st.session_state.analysis_criteria
-            if criterion.get("selected", False)
-        )
-        with action_cols[0]:
-            if st.button(
-                t("delete_selected_criteria"),
-                disabled=selected_count == 0,
-            ):
-                _delete_selected_criteria(st.session_state.analysis_criteria)
-                _clear_criterion_widget_state()
-                st.rerun()
-        with action_cols[1]:
-            if st.button(
-                t("delete_all_criteria"),
-                disabled=not st.session_state.analysis_criteria,
-            ):
-                _delete_all_criteria(st.session_state.analysis_criteria)
-                _clear_criterion_widget_state()
-                st.rerun()
 
         filtered_criteria = _filter_criteria(
             st.session_state.analysis_criteria,
@@ -550,18 +564,47 @@ def _render_prompt_editor(t) -> AnalysisPromptConfig:
         for index, criterion in filtered_criteria:
             _render_criterion_editor(index, criterion, t)
 
-        if st.button(t("add_criterion"), type="secondary"):
-            st.session_state.analysis_criteria.append(
-                {
-                    "title": "",
-                    "description": "",
-                    "scoring_system": st.session_state.analysis_default_scoring_system,
-                    "include_review": False,
-                    "selected": False,
-                    "_ui_id": _new_criterion_ui_id(),
-                }
-            )
-            st.rerun()
+        action_cols = st.columns([2, 1, 1])
+                
+        with action_cols[0]:
+            if st.button(
+                t("add_criterion"), type="secondary", use_container_width=True
+            ):
+                st.session_state.analysis_criteria.append(
+                    {
+                        "title": "",
+                        "description": "",
+                        "scoring_system": st.session_state.analysis_default_scoring_system,
+                        "include_review": False,
+                        "selected": False,
+                        "_ui_id": _new_criterion_ui_id(),
+                    }
+                )
+                st.rerun()
+                
+        selected_count = sum(
+            1
+            for criterion in st.session_state.analysis_criteria
+            if criterion.get("selected", False)
+        )
+        with action_cols[1]:
+            if st.button(
+                t("delete_selected_criteria"),
+                disabled=selected_count == 0,
+                use_container_width=True
+            ):
+                _delete_selected_criteria(st.session_state.analysis_criteria)
+                _clear_criterion_widget_state()
+                st.rerun()
+        with action_cols[2]:
+            if st.button(
+                t("delete_all_criteria"),
+                disabled=not st.session_state.analysis_criteria,
+                use_container_width=True
+            ):
+                _delete_all_criteria(st.session_state.analysis_criteria)
+                _clear_criterion_widget_state()
+                st.rerun()
 
     criteria = [
         CriterionConfig(
@@ -618,42 +661,6 @@ def _ensure_prompt_state() -> None:
     if "pending_analysis_prompt_config" in st.session_state:
         _apply_prompt_config_to_state(st.session_state.pending_analysis_prompt_config)
         del st.session_state.pending_analysis_prompt_config
-
-def _render_prompt_config_io(t) -> None:
-    with st.expander(t("prompt_config_io"), expanded=False):
-        config_json = json.dumps(
-            _build_prompt_config_export(),
-            ensure_ascii=False,
-            indent=2,
-        )
-        
-        uploaded_config = st.file_uploader(
-            t("prompt_config_file"),
-            type=["json"],
-            key="analysis_prompt_config_upload",
-        )
-
-        btn_cols = st.columns(2)
-        with btn_cols[0]:
-            if st.button(t("import_prompt_config"), disabled=uploaded_config is None, use_container_width=True):
-                try:
-                    if uploaded_config is None:
-                        return
-                    st.session_state.pending_analysis_prompt_config = (
-                        _normalize_prompt_config(json.load(uploaded_config))
-                    )
-                    st.rerun()
-                except Exception as error:
-                    st.error(t("invalid_prompt_config", error=error))
-
-        with btn_cols[1]:
-            st.download_button(
-                t("export_prompt_config"),
-                data=config_json,
-                file_name="analysis_prompt_config.json",
-                mime="application/json",
-                use_container_width=True,
-            )
 
 
 def _render_criterion_editor(index: int, criterion: dict, t) -> None:
@@ -837,7 +844,7 @@ def _render_results(results: list[dict], t) -> None:
             file_name="analysis_report.md",
             mime="text/markdown",
         )
-        
+
     with json_tab:
         st.json(results)
         st.download_button(
@@ -875,7 +882,7 @@ def main() -> None:
         # Analysis page - Refactored main() implementation
         # Main area: Complete analysis pipeline
         # Sidebar: Advanced settings only
-        
+
         # SIDEBAR: Advanced settings (keep in sidebar)
         with st.sidebar.expander(t("connection"), expanded=False):
             jira_server = st.text_input(
@@ -894,20 +901,20 @@ def main() -> None:
             )
 
         db_path = st.sidebar.text_input("Database Path", value="data/analysis.db", help="Path to SQLite database for intermediate results")
-        
+
         # MAIN AREA: Complete analysis pipeline
-        
+
         # Section 1: Data selection
         st.header(t("data_selection"))
         source = st.radio(t("issue_source"), ["Jira", "JSON"], horizontal=True)
-        
+
         uploaded_file = None
         use_sample = False
         jira_issue = ""
         jira_jql = ""
         jira_query_mode = "Issue key"
         exclude_closed = True
-        
+
         if source == "Jira":
             st.subheader(t("query"))
             jira_query_mode = st.radio(
@@ -924,7 +931,7 @@ def main() -> None:
                     value="project = YA",
                     height=100,
                 )
-            
+
             exclude_closed = st.checkbox(
                 t("exclude_closed"),
                 value=True,
@@ -935,16 +942,15 @@ def main() -> None:
                 t("use_sample"),
                 value=not uploaded_file,
             )
-        
+
         st.divider()
-        
+
         # Section 2: Analysis configuration (prompt settings)
         _ensure_prompt_state()
-        _render_prompt_config_io(t)
         prompt_config = _render_prompt_editor(t)
-        
+
         st.divider()
-        
+
         # Section 3: Analysis execution settings
         st.header(t("analysis_execution_settings"))
         worker_count = st.number_input(
@@ -958,9 +964,9 @@ def main() -> None:
             value=False,
             help=t("split_by_criterion_help"),
         )
-        
+
         st.divider()
-        
+
         # Section 4: Run analysis button
         if st.button(t("run_analysis"), type="primary"):
             st.session_state.analysis_results = None
