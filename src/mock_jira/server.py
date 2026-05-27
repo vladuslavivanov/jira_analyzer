@@ -247,6 +247,10 @@ def make_handler(issues: dict[str, dict[str, Any]]) -> type[BaseHTTPRequestHandl
                 )
                 return
 
+            if self._is_field_path(path_parts):
+                self._send_fields_list()
+                return
+
             self._send_json(
                 {
                     "errorMessages": [
@@ -306,6 +310,15 @@ def make_handler(issues: dict[str, dict[str, Any]]) -> type[BaseHTTPRequestHandl
             )
 
         @staticmethod
+        def _is_field_path(path_parts: list[str]) -> bool:
+            return (
+                len(path_parts) == 4
+                and path_parts[:2] == ["rest", "api"]
+                and path_parts[2] in {"2", "3", "latest"}
+                and path_parts[3] == "field"
+            )
+
+        @staticmethod
         def _is_search_path(path_parts: list[str]) -> bool:
             return (
                 len(path_parts) == 4
@@ -324,6 +337,133 @@ def make_handler(issues: dict[str, dict[str, Any]]) -> type[BaseHTTPRequestHandl
             ):
                 return path_parts[4]
             return None
+
+        def _send_fields_list(self) -> None:
+            fields = [
+                {
+                    "id": "summary",
+                    "name": "Summary",
+                    "custom": False,
+                    "orderable": True,
+                    "navigable": True,
+                    "searchable": True,
+                    "schema": {
+                        "type": "string",
+                        "system": "summary"
+                    }
+                },
+                {
+                    "id": "description",
+                    "name": "Description",
+                    "custom": False,
+                    "orderable": True,
+                    "navigable": True,
+                    "searchable": True,
+                    "schema": {
+                        "type": "string",
+                        "system": "description"
+                    }
+                },
+                {
+                    "id": "status",
+                    "name": "Status",
+                    "custom": False,
+                    "orderable": True,
+                    "navigable": True,
+                    "searchable": True,
+                    "schema": {
+                        "type": "status",
+                        "system": "status"
+                    }
+                },
+                {
+                    "id": "issuetype",
+                    "name": "Issue Type",
+                    "custom": False,
+                    "orderable": True,
+                    "navigable": True,
+                    "searchable": True,
+                    "schema": {
+                        "type": "issuetype",
+                        "system": "issuetype"
+                    }
+                },
+                {
+                    "id": "project",
+                    "name": "Project",
+                    "custom": False,
+                    "orderable": True,
+                    "navigable": True,
+                    "searchable": True,
+                    "schema": {
+                        "type": "project",
+                        "system": "project"
+                    }
+                },
+                {
+                    "id": "priority",
+                    "name": "Priority",
+                    "custom": False,
+                    "orderable": True,
+                    "navigable": True,
+                    "searchable": True,
+                    "schema": {
+                        "type": "priority",
+                        "system": "priority"
+                    }
+                },
+                {
+                    "id": "labels",
+                    "name": "Labels",
+                    "custom": False,
+                    "orderable": True,
+                    "navigable": True,
+                    "searchable": True,
+                    "schema": {
+                        "type": "array",
+                        "items": "string",
+                        "system": "labels"
+                    }
+                },
+                {
+                    "id": "created",
+                    "name": "Created",
+                    "custom": False,
+                    "orderable": True,
+                    "navigable": True,
+                    "searchable": True,
+                    "schema": {
+                        "type": "datetime",
+                        "system": "created"
+                    }
+                },
+                {
+                    "id": "updated",
+                    "name": "Updated",
+                    "custom": False,
+                    "orderable": True,
+                    "navigable": True,
+                    "searchable": True,
+                    "schema": {
+                        "type": "datetime",
+                        "system": "updated"
+                    }
+                },
+                {
+                    "id": "key",
+                    "name": "Key",
+                    "custom": False,
+                    "orderable": True,
+                    "navigable": True,
+                    "searchable": True,
+                    "schema": {
+                        "type": "string",
+                        "system": "issuekey"
+                    }
+                }
+            ]
+            
+            self._send_json(fields)
 
         def _send_search_results(
             self,
@@ -357,7 +497,7 @@ def make_handler(issues: dict[str, dict[str, Any]]) -> type[BaseHTTPRequestHandl
 
         def _send_json(
             self,
-            body: dict[str, Any],
+            body: Any,
             status: HTTPStatus = HTTPStatus.OK,
         ) -> None:
             payload = json.dumps(body, ensure_ascii=False).encode("utf-8")
