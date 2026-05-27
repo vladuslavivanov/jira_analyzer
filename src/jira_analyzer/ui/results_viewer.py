@@ -66,6 +66,10 @@ class ResultsViewer:
         try:
             results = self.repository.get_all_results()
             
+            # Load analysis runs and criteria for run-based filtering
+            analysis_runs = self.repository.get_analysis_runs()
+            st.session_state.analysis_runs = analysis_runs
+            
             # Validate results structure to prevent downstream errors
             validated_results = []
             for result in results:
@@ -81,6 +85,7 @@ class ResultsViewer:
                         "created_at": result.get("created_at"),
                         "analyzed_at": result.get("analyzed_at"),
                         "analysis": result.get("analysis", {}),
+                        "run_id": result.get("run_id"),
                     }
                     validated_results.append(validated_result)
                 except Exception as validation_error:
@@ -109,6 +114,20 @@ class ResultsViewer:
             results: List of analysis results to display.
         """
         st.subheader(self.t("results_list"))
+
+        # Analysis run filter
+        analysis_runs = st.session_state.get("analysis_runs", [])
+        if analysis_runs:
+            run_options = [("All Runs", None)] + [(r.get("run_name", f"Run {r['run_id']}"), r['run_id']) for r in analysis_runs]
+            run_filter = st.selectbox(
+                "Analysis Run",
+                options=[name for name, _ in run_options],
+                index=0,
+                key="run_filter",
+            )
+            selected_run_id = [run_id for name, run_id in run_options if name == run_filter][0]
+        else:
+            selected_run_id = None
 
         # Search and filter controls
         search_text = st.text_input(
@@ -139,7 +158,7 @@ class ResultsViewer:
         st.divider()
 
         # Apply filters
-        filtered_results = self._filter_results(results, search_text, status_filter, min_score)
+        filtered_results = self._filter_results(results, search_text, status_filter, min_score, selected_run_id)
 
         if not filtered_results:
             st.warning(self.t("no_matching_results"))
@@ -172,6 +191,7 @@ class ResultsViewer:
         search_text: str,
         status_filter: str,
         min_score: float,
+        selected_run_id: int | None = None,
     ) -> List[Dict[str, Any]]:
         """Filter results based on search text and filters.
 
@@ -180,11 +200,16 @@ class ResultsViewer:
             search_text: Text to search for.
             status_filter: Status filter to apply.
             min_score: Minimum score threshold.
+            selected_run_id: Analysis run ID to filter by.
 
         Returns:
             Filtered list of results.
         """
         filtered = results
+
+        # Analysis run filter
+        if selected_run_id is not None:
+            filtered = [r for r in filtered if r.get("run_id") == selected_run_id]
 
         # Status filter - map UI-friendly values to database state values
         # Defensive filtering: handle None states and use exact matching
@@ -282,6 +307,68 @@ class ResultsViewer:
         else:
             st.info(self.t("no_description"))
 
+        # Display analysis run configuration if available
+        run_id = result.get("run_id")
+        if run_id:
+            self._display_analysis_run_configuration(run_id)
+
+    def _display_analysis_run_configuration(self, run_id: int) -> None:
+        """Display analysis run configuration information.
+
+        Args:
+            run_id: Analysis run ID.
+        """
+        try:
+            analysis_run = self.repository.get_analysis_run(run_id)
+            if analysis_run:
+                st.subheader("⚙️ Analysis Configuration")
+                
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.text("Run Name:")
+                    st.text(analysis_run.get("run_name", f"Run {run_id}"))
+                with col2:
+                    st.text("Created:")
+                    st.text(analysis_run.get("created_at", "N/A"))
+                
+                st.divider()
+                
+                # Display run configuration details
+                if analysis_run.get("system_prompt"):
+                    st.write("**System Prompt:**")
+                    st.text_area("System Prompt", value=analysis_run.get("system_prompt", ""), height=100, disabled=True)
+                
+                if analysis_run.get("general_prompt"):
+                    st.write("**General Prompt:**")
+                    st.text_area("General Prompt", value=analysis_run.get("general_prompt", ""), height=100, disabled=True)
+                
+                # Display run settings
+                config_col1, config_col2 = st.columns(2)
+                with config_col1:
+                    include_overall = analysis_run.get("include_overall_conclusion", True)
+                    st.write(f"**Include Overall Conclusion:** {'Yes' if include_overall else 'No'}")
+                with config_col2:
+                    split_by_criterion = analysis_run.get("split_by_criterion", False)
+                    st.write(f"**Split By Criterion:** {'Yes' if split_by_criterion else 'No'}")
+                
+                # Display criteria definitions summary
+                criteria = self.repository.get_criteria(run_id)
+                if criteria:
+                    st.divider()
+                    st.write(f"**Total Criteria:** {len(criteria)}")
+                    with st.expander("📋 View All Criteria Definitions", expanded=False):
+                        for i, criterion in enumerate(criteria, 1):
+                            st.write(f"**{i}. {criterion.get('title', 'Unknown Criterion')}**")
+                            if criterion.get('description'):
+                                st.write(f"*{criterion.get('description')}*")
+                            st.write(f"Scoring: {criterion.get('scoring_system', 'percent')}")
+                            if criterion.get('include_review'):
+                                st.write("*Includes review*")
+                            st.divider()
+                            
+        except Exception as e:
+            st.warning(f"Could not load analysis configuration: {e}")
+
     def _display_analysis_result(self, result: Dict[str, Any]) -> None:
         """Display detailed analysis results.
 
@@ -296,6 +383,10 @@ class ResultsViewer:
             st.warning(self.t("no_analysis_data"))
             return
 
+        # Get criteria definitions for this analysis run
+        run_id = result.get("run_id")
+        criteria_definitions = self._get_criteria_definitions(run_id)
+
         # Overall conclusion
         overall_conclusion = analysis.get("overall_conclusion")
         if overall_conclusion:
@@ -306,7 +397,7 @@ class ResultsViewer:
         criteria_scores = analysis.get("criteria_scores", {})
         if criteria_scores:
             st.subheader(self.t("criteria_breakdown"))
-            self._display_criteria_scores(criteria_scores)
+            self._display_criteria_scores(criteria_scores, criteria_definitions)
         else:
             # Legacy format: check for 'criteria' field
             criteria = analysis.get("criteria", {})
@@ -321,14 +412,59 @@ class ResultsViewer:
             for i, recommendation in enumerate(recommendations, 1):
                 st.markdown(f"{i}. {recommendation}")
 
-    def _display_criteria_scores(self, criteria_scores: Dict[str, Any]) -> None:
+    def _get_criteria_definitions(self, run_id: int | None) -> Dict[str, Dict[str, Any]]:
+        """Get criteria definitions for an analysis run.
+
+        Args:
+            run_id: Analysis run ID.
+
+        Returns:
+            Dictionary of criteria definitions keyed by criterion_key.
+        """
+        if not run_id:
+            return {}
+        
+        try:
+            criteria = self.repository.get_criteria(run_id)
+            return {c.get("criterion_key", c.get("title")): c for c in criteria}
+        except Exception:
+            return {}
+
+    def _display_criteria_scores(self, criteria_scores: Dict[str, Any], criteria_definitions: Dict[str, Dict[str, Any]] = None) -> None:
         """Display criteria scores in a formatted way.
 
         Args:
             criteria_scores: Dictionary of criteria with scores and reviews.
+            criteria_definitions: Dictionary of criteria definitions keyed by criterion_key.
         """
+        if criteria_definitions is None:
+            criteria_definitions = {}
+        
         for criterion_name, criterion_data in criteria_scores.items():
-            with st.expander(criterion_name, expanded=False):
+            # Get the criteria definition for this criterion
+            criterion_def = criteria_definitions.get(criterion_name)
+            
+            # Create a more descriptive title if we have the definition
+            if criterion_def and criterion_def.get("title"):
+                display_title = criterion_def.get("title")
+            else:
+                display_title = criterion_name
+            
+            with st.expander(display_title, expanded=False):
+                # Show criteria definition if available
+                if criterion_def:
+                    st.write("📋 **Criteria Definition:**")
+                    if criterion_def.get("description"):
+                        st.write(f"*{criterion_def.get('description')}*")
+                    
+                    scoring_system = criterion_def.get("scoring_system", "percent")
+                    st.write(f"**Scoring System:** {scoring_system}")
+                    
+                    if criterion_def.get("include_review"):
+                        st.write("**Includes:** Review")
+                    
+                    st.divider()
+                
                 if isinstance(criterion_data, dict):
                     score = criterion_data.get("score")
                     review = criterion_data.get("review")

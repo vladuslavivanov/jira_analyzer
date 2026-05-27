@@ -23,10 +23,43 @@ class SqliteAnalysisResultRepository(AnalysisResultRepository):
 
     def _initialize_database(self) -> None:
         with sqlite3.connect(self.database_path) as connection:
+            # Create analysis runs table to track analysis sessions
+            connection.execute(
+                """
+                CREATE TABLE IF NOT EXISTS analysis_runs (
+                    run_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    run_name TEXT,
+                    created_at TEXT,
+                    system_prompt TEXT,
+                    general_prompt TEXT,
+                    include_overall_conclusion INTEGER,
+                    split_by_criterion INTEGER DEFAULT 0
+                )
+                """
+            )
+            
+            # Create criteria table to store criterion definitions
+            connection.execute(
+                """
+                CREATE TABLE IF NOT EXISTS criteria (
+                    criterion_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    run_id INTEGER,
+                    title TEXT,
+                    description TEXT,
+                    scoring_system TEXT,
+                    include_review INTEGER DEFAULT 0,
+                    criterion_key TEXT,
+                FOREIGN KEY (run_id) REFERENCES analysis_runs(run_id)
+                )
+                """
+            )
+            
+            # Create analysis_results table with run_id reference
             connection.execute(
                 """
                 CREATE TABLE IF NOT EXISTS analysis_results (
                     task_id TEXT PRIMARY KEY,
+                    run_id INTEGER,
                     title TEXT,
                     description TEXT,
                     status TEXT,
@@ -38,23 +71,40 @@ class SqliteAnalysisResultRepository(AnalysisResultRepository):
                     summary TEXT,
                     recommendations TEXT,
                     raw_response TEXT,
-                    analyzed_at TEXT
+                    analyzed_at TEXT,
+                FOREIGN KEY (run_id) REFERENCES analysis_runs(run_id)
                 )
                 """
             )
+            
+            # Create indexes for better query performance
+            connection.execute(
+                """
+                CREATE INDEX IF NOT EXISTS idx_analysis_results_run_id 
+                ON analysis_results(run_id)
+                """
+            )
+            connection.execute(
+                """
+                CREATE INDEX IF NOT EXISTS idx_criteria_run_id 
+                ON criteria(run_id)
+                """
+            )
+            
             connection.commit()
 
-    def save_pending(self, task_id: str, task_data: Dict[str, Any]) -> None:
+    def save_pending(self, task_id: str, task_data: Dict[str, Any], run_id: int | None = None) -> None:
         """Save a pending analysis entry for a task."""
         with sqlite3.connect(self.database_path) as conn:
             conn.execute(
                 """
                 INSERT OR REPLACE INTO analysis_results 
-                (task_id, title, description, status, assignee, created_at, updated_at, state)
-                VALUES (?, ?, ?, ?, ?, ?, ?, 'PENDING')
+                (task_id, run_id, title, description, status, assignee, created_at, updated_at, state)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'PENDING')
                 """,
                 (
                     task_id,
+                    run_id,
                     task_data.get("title"),
                     task_data.get("description"),
                     task_data.get("status"),
@@ -308,3 +358,121 @@ class SqliteAnalysisResultRepository(AnalysisResultRepository):
             all_results.sort(key=lambda x: x.get("analyzed_at", ""), reverse=True)
             return [r["analysis"] for r in all_results[:50]]
         return []
+
+    # Analysis run management methods
+    def create_analysis_run(
+        self,
+        run_name: str | None = None,
+        system_prompt: str = "",
+        general_prompt: str = "",
+        include_overall_conclusion: bool = True,
+        split_by_criterion: bool = False,
+    ) -> int:
+        """Create a new analysis run and return its ID."""
+        now = datetime.now(timezone(timedelta(hours=3))).isoformat()
+        with sqlite3.connect(self.database_path) as conn:
+            cursor = conn.execute(
+                """
+                INSERT INTO analysis_runs 
+                (run_name, created_at, system_prompt, general_prompt, include_overall_conclusion, split_by_criterion)
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    run_name,
+                    now,
+                    system_prompt,
+                    general_prompt,
+                    1 if include_overall_conclusion else 0,
+                    1 if split_by_criterion else 0,
+                ),
+            )
+            conn.commit()
+            return cursor.lastrowid
+
+    def save_criteria(
+        self,
+        run_id: int,
+        criteria: list[dict]
+    ) -> None:
+        """Save criteria definitions for an analysis run."""
+        with sqlite3.connect(self.database_path) as conn:
+            # Clear existing criteria for this run
+            conn.execute("DELETE FROM criteria WHERE run_id = ?", (run_id,))
+            
+            # Insert new criteria
+            for criterion in criteria:
+                conn.execute(
+                    """
+                    INSERT INTO criteria 
+                    (run_id, title, description, scoring_system, include_review, criterion_key)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        run_id,
+                        criterion.get("title", ""),
+                        criterion.get("description", ""),
+                        criterion.get("scoring_system", "percent"),
+                        1 if criterion.get("include_review", False) else 0,
+                        criterion.get("key", ""),
+                    ),
+                )
+            conn.commit()
+
+    def get_analysis_run(self, run_id: int) -> Optional[Dict[str, Any]]:
+        """Get analysis run configuration by ID."""
+        with sqlite3.connect(self.database_path) as conn:
+            cursor = conn.execute(
+                "SELECT * FROM analysis_runs WHERE run_id = ?",
+                (run_id,),
+            )
+            row = cursor.fetchone()
+            if not row:
+                return None
+
+            columns = [description[0] for description in cursor.description]
+            data = dict(zip(columns, row))
+            
+            # Convert boolean fields
+            data["include_overall_conclusion"] = bool(data.get("include_overall_conclusion", 1))
+            data["split_by_criterion"] = bool(data.get("split_by_criterion", 0))
+            
+            return data
+
+    def get_analysis_runs(self) -> List[Dict[str, Any]]:
+        """Get all analysis runs."""
+        with sqlite3.connect(self.database_path) as conn:
+            cursor = conn.execute(
+                "SELECT * FROM analysis_runs ORDER BY created_at DESC"
+            )
+            rows = cursor.fetchall()
+            results = []
+            for row in rows:
+                columns = [desc[0] for desc in cursor.description]
+                data = dict(zip(columns, row))
+                
+                # Convert boolean fields
+                data["include_overall_conclusion"] = bool(data.get("include_overall_conclusion", 1))
+                data["split_by_criterion"] = bool(data.get("split_by_criterion", 0))
+                
+                results.append(data)
+            return results
+
+    def get_criteria(self, run_id: int) -> List[Dict[str, Any]]:
+        """Get criteria definitions for an analysis run."""
+        with sqlite3.connect(self.database_path) as conn:
+            cursor = conn.execute(
+                "SELECT * FROM criteria WHERE run_id = ? ORDER BY criterion_id",
+                (run_id,),
+            )
+            rows = cursor.fetchall()
+            results = []
+            if rows:
+                for row in rows:
+                    columns = [desc[0] for desc in cursor.description]
+                    data = dict(zip(columns, row))
+                    
+                    # Convert boolean fields
+                    data["include_review"] = bool(data.get("include_review", 0))
+                    
+                    results.append(data)
+            return results

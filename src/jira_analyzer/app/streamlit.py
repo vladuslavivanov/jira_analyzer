@@ -8,10 +8,8 @@ from jira_analyzer.analyzer.core.llm.prompt_builder import (
     AnalysisPromptConfig,
     CriterionConfig,
 )
-from jira_analyzer.analyzer.engine import (
-    get_default_analysis_prompt_config,
-    run_analysis,
-)
+from jira_analyzer.analyzer.service import AnalysisService
+from jira_analyzer.analyzer.engine import get_default_analysis_prompt_config
 from jira_analyzer.app.output_handler import build_markdown_report
 from jira_analyzer.storage import SqliteAnalysisResultRepository
 from jira_analyzer.tasktracker.jira import (
@@ -995,13 +993,30 @@ def main() -> None:
                     t("analyzing", count=len(issues), workers=int(worker_count))
                 ):
                     repo = SqliteAnalysisResultRepository(db_path)
-                    results = run_analysis(
-                        issues,
+                    
+                    # Create a meaningful run name based on analysis type
+                    if source == "Jira":
+                        if jira_query_mode == "Issue key":
+                            run_name = f"Issue Analysis: {jira_issue}"
+                        else:
+                            run_name = f"JQL Analysis: {jira_jql[:50]}..."
+                    else:
+                        run_name = "JSON Dataset Analysis"
+                    
+                    # Create analysis service first to get run_id
+                    service = AnalysisService(
                         prompt_config=prompt_config,
                         worker_count=int(worker_count),
                         split_by_criterion=split_by_criterion,
                         repo=repo,
                     )
+                    
+                    # Create analysis run and get run_id
+                    run_id = service.create_analysis_run(run_name=run_name)
+                    st.session_state.current_run_id = run_id
+                    
+                    # Perform analysis using the service with run_id
+                    results = service.analyze_issues(issues)
 
                 st.session_state.analysis_results = results
                 st.success(t("analysis_complete"))
