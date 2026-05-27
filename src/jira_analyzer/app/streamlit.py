@@ -486,7 +486,7 @@ def _render_results_page(t) -> None:
         logger.exception("Results viewer error")
 
 def _render_prompt_editor(t) -> AnalysisPromptConfig:
-    with st.expander(t("analysis_prompt"), expanded=True):
+    with st.expander(t("analysis_prompt"), expanded=False):
         # Integrated Import/Export configuration controls
         st.subheader(t("prompt_config_io"))
         config_json = json.dumps(
@@ -953,10 +953,11 @@ def main() -> None:
 
         # Section 3: Analysis execution settings
         st.header(t("analysis_execution_settings"))
-        worker_count = st.number_input(
+        worker_count = st.slider(
             t("worker_count"),
             min_value=1,
-            value=1,
+            max_value=10,
+            value=4,
             step=1,
         )
         split_by_criterion = st.checkbox(
