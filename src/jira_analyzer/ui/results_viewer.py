@@ -135,27 +135,16 @@ class ResultsViewer:
         # Filtering options
         filter_container = st.container()
         with filter_container:
-            filter_col1, filter_col2 = st.columns(2)
-            with filter_col1:
-                status_filter = st.selectbox(
-                    self.t("filter_by_status"),
-                    options=["All", "Completed", "Failed"],
-                    key="status_filter",
-                )
-            with filter_col2:
-                min_score = st.number_input(
-                    self.t("minimum_score"),
-                    min_value=0.0,
-                    max_value=10.0,
-                    value=0.0,
-                    step=0.5,
-                    key="min_score_filter",
-                )
+            status_filter = st.selectbox(
+                self.t("filter_by_status"),
+                options=["All", "Completed", "Failed"],
+                key="status_filter",
+            )
 
         st.divider()
 
         # Apply filters
-        filtered_results = self._filter_results(results, search_text, status_filter, min_score, selected_run_id)
+        filtered_results = self._filter_results(results, search_text, status_filter, selected_run_id)
 
         if not filtered_results:
             st.warning(self.t("no_matching_results"))
@@ -184,7 +173,6 @@ class ResultsViewer:
         results: List[Dict[str, Any]],
         search_text: str,
         status_filter: str,
-        min_score: float,
         selected_run_id: int | None = None,
     ) -> List[Dict[str, Any]]:
         """Filter results based on search text and filters.
@@ -193,7 +181,6 @@ class ResultsViewer:
             results: List of all results.
             search_text: Text to search for.
             status_filter: Status filter to apply.
-            min_score: Minimum score threshold.
             selected_run_id: Analysis run ID to filter by.
 
         Returns:
