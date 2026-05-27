@@ -436,6 +436,7 @@ def _normalize_prompt_config(config: dict) -> dict:
         "include_overall_conclusion": bool(
             config.get("include_overall_conclusion", True)
         ),
+        "reasoning_mode": bool(config.get("reasoning_mode", False)),
         "default_scoring_system": default_scoring_system,
         "criteria": imported_criteria,
     }
@@ -965,6 +966,22 @@ def main() -> None:
             value=False,
             help=t("split_by_criterion_help"),
         )
+        
+        # LLM reasoning mode settings
+        reasoning_enabled = st.checkbox(
+            "Enable LLM Reasoning Mode",
+            value=False,
+            help="Enable DeepSeek reasoning mode for improved analysis quality (may increase response time)"
+        )
+        
+        reasoning_effort = None
+        if reasoning_enabled:
+            reasoning_effort = st.selectbox(
+                "Reasoning Effort Level",
+                options=["high", "max"],
+                index=0,
+                help="Level of reasoning effort: 'high' for balanced performance, 'max' for best results (slower)"
+            )
 
         st.divider()
 
@@ -1011,6 +1028,8 @@ def main() -> None:
                         worker_count=int(worker_count),
                         split_by_criterion=split_by_criterion,
                         repo=repo,
+                        reasoning_enabled=reasoning_enabled,
+                        reasoning_effort=reasoning_effort,
                     )
                     
                     # Create analysis run and get run_id

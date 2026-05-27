@@ -13,9 +13,17 @@ LLM_FAKE_SCENARIO = os.getenv("LLM_FAKE_SCENARIO", "default")
 # LLM debugging settings
 LOG_LLM_PROMPTS = os.getenv("LOG_LLM_PROMPTS", "false").lower() == "true"
 
+# LLM reasoning mode settings (for models like DeepSeek)
+LLM_REASONING_ENABLED = os.getenv("LLM_REASONING_ENABLED", "false").lower() == "true"
+LLM_REASONING_EFFORT = os.getenv("LLM_REASONING_EFFORT", "high")  # Options: "high", "max"
 
-def resolve_llm_config() -> dict:
+
+def resolve_llm_config(reasoning_enabled: bool | None = None, reasoning_effort: str | None = None) -> dict:
     """Resolve LLM configuration from environment variables.
+    
+    Args:
+        reasoning_enabled: Optional override for reasoning mode (from UI)
+        reasoning_effort: Optional override for reasoning effort (from UI)
     
     Returns provider configuration dictionary that can be used with ProviderFactory.
     """
@@ -27,11 +35,17 @@ def resolve_llm_config() -> dict:
         if not LLM_API_KEY:
             raise ValueError("LLM_API_KEY not set in environment for openai-compatible provider")
         
+        # Use UI overrides if provided, otherwise use environment variables
+        final_reasoning_enabled = reasoning_enabled if reasoning_enabled is not None else LLM_REASONING_ENABLED
+        final_reasoning_effort = reasoning_effort if reasoning_effort is not None else str(LLM_REASONING_EFFORT)
+        
         return {
             "provider_type": provider_type,
             "api_key": str(LLM_API_KEY),
             "base_url": str(LLM_BASE_URL),
-            "model": str(LLM_MODEL)
+            "model": str(LLM_MODEL),
+            "reasoning_enabled": final_reasoning_enabled,
+            "reasoning_effort": final_reasoning_effort
         }
     
     elif provider_type == "fake":

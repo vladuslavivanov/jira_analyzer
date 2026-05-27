@@ -19,7 +19,9 @@ class OpenAICompatibleProvider(BaseLLMProvider):
         self,
         api_key: str,
         base_url: str,
-        model: str
+        model: str,
+        reasoning_enabled: bool = False,
+        reasoning_effort: str = "high"
     ):
         """Initialize with connection details.
 
@@ -27,12 +29,16 @@ class OpenAICompatibleProvider(BaseLLMProvider):
             api_key: API authentication key (required)
             base_url: API endpoint URL (required)
             model: Model identifier to use (required)
+            reasoning_enabled: Enable LLM reasoning mode for models like DeepSeek (default: False)
+            reasoning_effort: Reasoning effort level when reasoning is enabled (default: "high")
         """
         self._client = OpenAI(
             api_key=api_key,
             base_url=base_url
         )
         self._model = model
+        self._reasoning_enabled = reasoning_enabled
+        self._reasoning_effort = reasoning_effort
         self._logger = setup_logger(__name__)
 
     @property
@@ -53,6 +59,7 @@ class OpenAICompatibleProvider(BaseLLMProvider):
         # Log request if enabled
         if LOG_LLM_PROMPTS:
             self._logger.info("=== LLM Request ===")
+            self._logger.info(f"Reasoning enabled: {self._reasoning_enabled}, Effort: {self._reasoning_effort}")
             for msg in messages:
                 self._logger.info(f"{msg.role}: {msg.content}")
 
@@ -62,13 +69,21 @@ class OpenAICompatibleProvider(BaseLLMProvider):
             for msg in messages
         ]
 
+        # Prepare API call parameters
+        api_params = {
+            "model": self._model,
+            "messages": openai_messages,  # type: ignore[assignment]
+            "temperature": temperature,
+            "max_tokens": max_tokens
+        }
+
+        # Add reasoning mode parameters if enabled
+        if self._reasoning_enabled:
+            api_params["reasoning_effort"] = self._reasoning_effort
+            api_params["extra_body"] = {"thinking": {"type": "enabled"}}
+
         # Call API with explicit type ignore as we're formatting correctly
-        response = self._client.chat.completions.create(
-            model=self._model,
-            messages=openai_messages,  # type: ignore[assignment]
-            temperature=temperature,
-            max_tokens=max_tokens
-        )
+        response = self._client.chat.completions.create(**api_params)
 
         # Extract response content
         content = response.choices[0].message.content or ""

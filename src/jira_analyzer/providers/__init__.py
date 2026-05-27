@@ -23,6 +23,8 @@ class ProviderFactory:
             "api_key": "your-api-key",           # for openai-compatible only
             "base_url": "http://localhost:8000/v1",  # for openai-compatible only
             "model": "your-model-name",          # for openai-compatible only
+            "reasoning_enabled": false,            # optional: enable LLM reasoning
+            "reasoning_effort": "high",           # optional: reasoning level ("high", "max")
             "default_response": "response text"  # for fake only
         }
         """
@@ -38,7 +40,9 @@ class ProviderFactory:
             return OpenAICompatibleProvider(
                 api_key=config["api_key"],
                 base_url=config["base_url"],
-                model=config["model"]
+                model=config["model"],
+                reasoning_enabled=config.get("reasoning_enabled", False),
+                reasoning_effort=config.get("reasoning_effort", "high")
             )
 
         elif provider_type == "fake":
