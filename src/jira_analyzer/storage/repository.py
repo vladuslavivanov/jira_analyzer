@@ -49,6 +49,8 @@ class AnalysisResultRepository(ABC):
         general_prompt: str = "",
         include_overall_conclusion: bool = True,
         split_by_criterion: bool = False,
+        reasoning_enabled: bool = False,
+        reasoning_effort: str = "high",
     ) -> int:
         """Create a new analysis run and return its ID."""
         raise NotImplementedError()

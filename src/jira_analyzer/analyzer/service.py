@@ -43,8 +43,8 @@ class AnalysisService:
         task_repository: TasksRepository | None = None,
         repo: AnalysisResultRepository | None = None,
         run_id: int | None = None,
-        reasoning_enabled: bool | None = None,
-        reasoning_effort: str | None = None,
+        reasoning_enabled: bool = False,
+        reasoning_effort: str = "high",
     ):
         self.prompt_template = prompt_template
         self.prompt_config = prompt_config
@@ -95,6 +95,8 @@ class AnalysisService:
             general_prompt=self.prompt_config.general_prompt,
             include_overall_conclusion=self.prompt_config.include_overall_conclusion,
             split_by_criterion=self.split_by_criterion,
+            reasoning_enabled=self.reasoning_enabled,
+            reasoning_effort=self.reasoning_effort,
         )
         
         # Store the criteria for this run

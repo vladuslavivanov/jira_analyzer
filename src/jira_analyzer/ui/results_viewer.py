@@ -305,6 +305,11 @@ class ResultsViewer:
                         st.write(f"**Include Overall Conclusion:** {'Yes' if include_overall else 'No'}")
                         split_by_criterion = analysis_run.get("split_by_criterion", False)
                         st.write(f"**Split By Criterion:** {'Yes' if split_by_criterion else 'No'}")
+                        reasoning_enabled = analysis_run.get("reasoning_enabled", False)
+                        st.write(f"**LLM Reasoning Mode:** {'Enabled' if reasoning_enabled else 'Disabled'}")
+                        if reasoning_enabled:
+                            reasoning_effort = analysis_run.get("reasoning_effort", 'high')
+                            st.write(f"**Reasoning Effort:** {reasoning_effort.capitalize()}" )
                     
                     st.divider()
                     

@@ -33,7 +33,9 @@ class SqliteAnalysisResultRepository(AnalysisResultRepository):
                     system_prompt TEXT,
                     general_prompt TEXT,
                     include_overall_conclusion INTEGER,
-                    split_by_criterion INTEGER DEFAULT 0
+                    split_by_criterion INTEGER DEFAULT 0,
+                    reasoning_enabled INTEGER DEFAULT 0,
+                    reasoning_effort TEXT DEFAULT 'high'
                 )
                 """
             )
@@ -337,6 +339,8 @@ class SqliteAnalysisResultRepository(AnalysisResultRepository):
         general_prompt: str = "",
         include_overall_conclusion: bool = True,
         split_by_criterion: bool = False,
+        reasoning_enabled: bool = False,
+        reasoning_effort: str = "high",
     ) -> int:
         """Create a new analysis run and return its ID."""
         now = datetime.now(timezone(timedelta(hours=3))).isoformat()
@@ -344,8 +348,8 @@ class SqliteAnalysisResultRepository(AnalysisResultRepository):
             cursor = conn.execute(
                 """
                 INSERT INTO analysis_runs 
-                (run_name, created_at, system_prompt, general_prompt, include_overall_conclusion, split_by_criterion)
-                VALUES (?, ?, ?, ?, ?, ?)
+                (run_name, created_at, system_prompt, general_prompt, include_overall_conclusion, split_by_criterion, reasoning_enabled, reasoning_effort)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     run_name,
@@ -354,6 +358,8 @@ class SqliteAnalysisResultRepository(AnalysisResultRepository):
                     general_prompt,
                     1 if include_overall_conclusion else 0,
                     1 if split_by_criterion else 0,
+                    1 if reasoning_enabled else 0,
+                    reasoning_effort,
                 ),
             )
             conn.commit()
