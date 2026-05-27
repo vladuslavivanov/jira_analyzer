@@ -2,6 +2,7 @@
 
 from typing import Any, Dict, List, Callable
 
+import pandas as pd
 import streamlit as st
 
 from jira_analyzer.storage import SqliteAnalysisResultRepository
@@ -80,7 +81,6 @@ class ResultsViewer:
                         "title": result.get("title") or "No title",
                         "state": result.get("state", "UNKNOWN"),
                         "description": result.get("description", ""),
-                        "total_score": result.get("total_score"),
                         "assignee": result.get("assignee"),
                         "created_at": result.get("created_at"),
                         "analyzed_at": result.get("analyzed_at"),
@@ -168,8 +168,6 @@ class ResultsViewer:
         for result in filtered_results:
             task_id = result.get("task_id", "Unknown")
             title = result.get("title", "No title")
-            score = result.get("total_score")
-            score_display = f"{score:.1f}/10" if score is not None else "N/A"  
 
             # Create clickable card for each result
             is_selected = task_id == st.session_state.selected_result_id
@@ -177,9 +175,8 @@ class ResultsViewer:
             
             # Use button to select the result (simple direct interaction)
             if st.button(
-                f"{self.t('issue_title', id=task_id, title=title)} | {score_display}",
+                f"{self.t('issue_title', id=task_id, title=title)}",
                 key=f"select_{task_id}",
-                use_container_width=True,
                 type=card_color,
             ):
                 st.session_state.selected_result_id = task_id
@@ -219,13 +216,7 @@ class ResultsViewer:
             filtered = [r for r in filtered if r.get("state") == "FAILED"]
         # "All" means no status filter applied
 
-        # Score filter
-        if min_score > 0.0:
-            filtered = [
-                r for r in filtered
-                if r.get("total_score") is not None
-                and r.get("total_score") >= min_score
-            ]
+        # Score filtering is disabled as criteria may have different scoring systems
 
         # Text search
         if search_text:
@@ -266,54 +257,47 @@ class ResultsViewer:
         Args:
             result: Result dictionary.
         """
-        st.info(self.t("issue_summary_heading"))
+        st.header("📋 Brief Analysis Details")
 
-        # Basic information
+        # Manual table implementation for cleaner formatting
         col1, col2 = st.columns(2)
         with col1:
-            st.text(self.t("task_id"))
-            st.text(result.get("task_id", "N/A"))
-
-            st.text(self.t("title"))
-            st.text(result.get("title", "N/A"))
+            st.metric("Task ID", result.get("task_id", "N/A"), label_visibility="visible")
+            st.metric("Status", result.get("state", "N/A"), label_visibility="visible")
+            st.metric("Analysis Date", self._format_date(result.get("analyzed_at")), label_visibility="visible")
         with col2:
-            st.text(self.t("status"))
-            status = result.get("state", "N/A")
-            st.text(status)
+            st.metric("Assignee", result.get("assignee", "N/A"), label_visibility="visible")
+            st.metric("Creation Date", self._format_date(result.get("created_at")), label_visibility="visible")
 
-            score = result.get("total_score")
-            score_display = f"{score:.1f}/10" if score is not None else "N/A"
-            st.text(self.t("quality_score"))
-            st.text(score_display)
-
-        # Additional metadata
-        st.divider()
-        metadata_col1, metadata_col2 = st.columns(2)
-        with metadata_col1:
-            st.text(self.t("assignee"))
-            st.text(result.get("assignee", "N/A"))
-
-            st.text(self.t("created_at"))
-            st.text(result.get("created_at", "N/A"))
-        with metadata_col2:
-            st.text(self.t("analyzed_at"))
-            st.text(result.get("analyzed_at", "N/A"))
-
-        # Description
-        st.text(self.t("original_description"))
+        # Task Description
+        st.subheader("📝 Task Description")
         description = result.get("description", "")
         if description:
-            st.text_area(self.t("original_description"), value=description, disabled=False, height=150)
+            st.text_area("Description", value=description, disabled=True, height=200, label_visibility="collapsed")
         else:
-            st.info(self.t("no_description"))
+            st.info("No description available")
 
-        # Display analysis run configuration if available
-        run_id = result.get("run_id")
-        if run_id:
-            self._display_analysis_run_configuration(run_id)
+    def _format_date(self, date_str: str | None) -> str:
+        """Format date string for display.
+        
+        Args:
+            date_str: Date string to format.
+            
+        Returns:
+            Formatted date string or N/A
+        """
+        if not date_str:
+            return "N/A"
+        try:
+            # Try to parse ISO format and format nicely
+            from datetime import datetime
+            dt = datetime.fromisoformat(date_str.replace('Z', '+00:00') if 'Z' in date_str else date_str)
+            return dt.strftime('%Y-%m-%d %H:%M')
+        except (ValueError, TypeError):
+            return str(date_str)
 
-    def _display_analysis_run_configuration(self, run_id: int) -> None:
-        """Display analysis run configuration information.
+    def _display_analysis_run_configuration_collapsed(self, run_id: int) -> None:
+        """Display analysis run configuration information in a collapsed section.
 
         Args:
             run_id: Analysis run ID.
@@ -321,50 +305,42 @@ class ResultsViewer:
         try:
             analysis_run = self.repository.get_analysis_run(run_id)
             if analysis_run:
-                st.subheader("⚙️ Analysis Configuration")
-                
-                col1, col2 = st.columns(2)
-                with col1:
-                    st.text("Run Name:")
-                    st.text(analysis_run.get("run_name", f"Run {run_id}"))
-                with col2:
-                    st.text("Created:")
-                    st.text(analysis_run.get("created_at", "N/A"))
-                
-                st.divider()
-                
-                # Display run configuration details
-                if analysis_run.get("system_prompt"):
-                    st.write("**System Prompt:**")
-                    st.text_area("System Prompt", value=analysis_run.get("system_prompt", ""), height=100, disabled=True)
-                
-                if analysis_run.get("general_prompt"):
-                    st.write("**General Prompt:**")
-                    st.text_area("General Prompt", value=analysis_run.get("general_prompt", ""), height=100, disabled=True)
-                
-                # Display run settings
-                config_col1, config_col2 = st.columns(2)
-                with config_col1:
-                    include_overall = analysis_run.get("include_overall_conclusion", True)
-                    st.write(f"**Include Overall Conclusion:** {'Yes' if include_overall else 'No'}")
-                with config_col2:
-                    split_by_criterion = analysis_run.get("split_by_criterion", False)
-                    st.write(f"**Split By Criterion:** {'Yes' if split_by_criterion else 'No'}")
-                
-                # Display criteria definitions summary
-                criteria = self.repository.get_criteria(run_id)
-                if criteria:
+                with st.expander("⚙️ Analysis Configuration (Click to expand)", expanded=False):
+                    # Run metadata
+                    metadata_col1, metadata_col2 = st.columns(2)
+                    with metadata_col1:
+                        st.write(f"**Run Name:** {analysis_run.get('run_name', f'Run {run_id}')}")
+                        st.write(f"**Created:** {self._format_date(analysis_run.get('created_at'))}")
+                    with metadata_col2:
+                        include_overall = analysis_run.get("include_overall_conclusion", True)
+                        st.write(f"**Include Overall Conclusion:** {'Yes' if include_overall else 'No'}")
+                        split_by_criterion = analysis_run.get("split_by_criterion", False)
+                        st.write(f"**Split By Criterion:** {'Yes' if split_by_criterion else 'No'}")
+                    
                     st.divider()
-                    st.write(f"**Total Criteria:** {len(criteria)}")
-                    with st.expander("📋 View All Criteria Definitions", expanded=False):
-                        for i, criterion in enumerate(criteria, 1):
-                            st.write(f"**{i}. {criterion.get('title', 'Unknown Criterion')}**")
-                            if criterion.get('description'):
-                                st.write(f"*{criterion.get('description')}*")
-                            st.write(f"Scoring: {criterion.get('scoring_system', 'percent')}")
-                            if criterion.get('include_review'):
-                                st.write("*Includes review*")
-                            st.divider()
+                    
+                    # Display run configuration details
+                    if analysis_run.get("system_prompt"):
+                        st.subheader("🤖 System Prompt")
+                        st.text_area("System Prompt", value=analysis_run.get("system_prompt", ""), height=80, disabled=True, label_visibility="collapsed")
+                    
+                    if analysis_run.get("general_prompt"):
+                        st.subheader("📋 General Prompt")
+                        st.text_area("General Prompt", value=analysis_run.get("general_prompt", ""), height=80, disabled=True, label_visibility="collapsed")
+                    
+                    # Display criteria definitions summary
+                    criteria = self.repository.get_criteria(run_id)
+                    if criteria:
+                        st.subheader(f"📏 Criteria Definitions ({len(criteria)} criteria)")
+                        with st.expander("📋 View All Criteria Definitions", expanded=False):
+                            for i, criterion in enumerate(criteria, 1):
+                                st.markdown(f"**{i}. {criterion.get('title', 'Unknown Criterion')}**")
+                                if criterion.get('description'):
+                                    st.markdown(f"*{criterion.get('description')}*")
+                                st.write(f"**Scoring System:** {criterion.get('scoring_system', 'percent')}")
+                                if criterion.get('include_review'):
+                                    st.write("*Includes review*")
+                                st.divider()
                             
         except Exception as e:
             st.warning(f"Could not load analysis configuration: {e}")
@@ -376,41 +352,42 @@ class ResultsViewer:
             result: Result dictionary with analysis data.
         """
         st.divider()
-        st.subheader(self.t("analysis_results"))
+        st.header("📊 Analysis Results")
 
         analysis = result.get("analysis", {})
         if not analysis:
             st.warning(self.t("no_analysis_data"))
             return
 
-        # Get criteria definitions for this analysis run
-        run_id = result.get("run_id")
-        criteria_definitions = self._get_criteria_definitions(run_id)
-
         # Overall conclusion
         overall_conclusion = analysis.get("overall_conclusion")
         if overall_conclusion:
-            st.subheader(self.t("overall_conclusion"))
+            st.subheader("🎯 Overall Conclusion")
             st.markdown(overall_conclusion)
 
-        # Criteria scores
+        # Criteria scores - Table formatted display
         criteria_scores = analysis.get("criteria_scores", {})
         if criteria_scores:
-            st.subheader(self.t("criteria_breakdown"))
-            self._display_criteria_scores(criteria_scores, criteria_definitions)
+            st.subheader("📈 Criteria Breakdown")
+            self._display_criteria_scores_table(result, criteria_scores)
         else:
             # Legacy format: check for 'criteria' field
             criteria = analysis.get("criteria", {})
             if criteria:
-                st.subheader(self.t("criteria_breakdown"))
-                self._display_legacy_criteria(criteria)
+                st.subheader("📈 Criteria Breakdown")
+                self._display_legacy_criteria_table(criteria)
 
         # Recommendations
         recommendations = analysis.get("recommendations", [])
         if recommendations:
-            st.subheader(self.t("recommendations"))
+            st.subheader("💡 Recommendations")
             for i, recommendation in enumerate(recommendations, 1):
                 st.markdown(f"{i}. {recommendation}")
+                
+        # Analysis Run Configuration (under cut)
+        run_id = result.get("run_id")
+        if run_id:
+            self._display_analysis_run_configuration_collapsed(run_id)
 
     def _get_criteria_definitions(self, run_id: int | None) -> Dict[str, Dict[str, Any]]:
         """Get criteria definitions for an analysis run.
@@ -430,89 +407,100 @@ class ResultsViewer:
         except Exception:
             return {}
 
-    def _display_criteria_scores(self, criteria_scores: Dict[str, Any], criteria_definitions: Dict[str, Dict[str, Any]] = None) -> None:
-        """Display criteria scores in a formatted way.
+    def _display_criteria_scores_table(self, result: Dict[str, Any], criteria_scores: Dict[str, Any]) -> None:
+        """Display criteria scores in a table format.
 
         Args:
+            result: Result dictionary containing run_id.
             criteria_scores: Dictionary of criteria with scores and reviews.
-            criteria_definitions: Dictionary of criteria definitions keyed by criterion_key.
         """
-        if criteria_definitions is None:
-            criteria_definitions = {}
+        run_id = result.get("run_id")
+        criteria_definitions = self._get_criteria_definitions(run_id) if run_id else {}
         
+        # Prepare data for table
+        table_data = []
         for criterion_name, criterion_data in criteria_scores.items():
             # Get the criteria definition for this criterion
             criterion_def = criteria_definitions.get(criterion_name)
             
-            # Create a more descriptive title if we have the definition
+            # Get display title
             if criterion_def and criterion_def.get("title"):
                 display_title = criterion_def.get("title")
             else:
                 display_title = criterion_name
             
-            with st.expander(display_title, expanded=False):
-                # Show criteria definition if available
-                if criterion_def:
-                    st.write("📋 **Criteria Definition:**")
-                    if criterion_def.get("description"):
-                        st.write(f"*{criterion_def.get('description')}*")
-                    
-                    scoring_system = criterion_def.get("scoring_system", "percent")
-                    st.write(f"**Scoring System:** {scoring_system}")
-                    
-                    if criterion_def.get("include_review"):
-                        st.write("**Includes:** Review")
-                    
-                    st.divider()
+            # Get scoring system
+            scoring_system = criterion_def.get("scoring_system", "percent") if criterion_def else "N/A"
+            
+            # Get score
+            if isinstance(criterion_data, dict):
+                score = criterion_data.get("score")
+                review = criterion_data.get("review", "")
+            else:
+                score = criterion_data if isinstance(criterion_data, (int, float)) else None
+                review = ""
+            
+            # Format score display
+            score_display = f"{score:.1f}/10" if score is not None else "N/A"
+            
+            table_data.append({
+                "Criterion Name": display_title,
+                "Score": score_display,
+                "Score System": scoring_system,
+                "Review": review[:100] + "..." if len(str(review)) > 100 else review,
+            })
+        
+        # Display table
+        if table_data:
+            df = pd.DataFrame(table_data)
+            st.dataframe(df, width="stretch", hide_index=True)
+            
+            # Show detailed reviews in expandable sections
+            for criterion_name, criterion_data in criteria_scores.items():
+                criterion_def = criteria_definitions.get(criterion_name)
+                display_title = criterion_def.get("title") if criterion_def else criterion_name
                 
                 if isinstance(criterion_data, dict):
-                    score = criterion_data.get("score")
-                    review = criterion_data.get("review")
-
-                    col_score, col_name1 = st.columns([1, 3])
-                    with col_score:
-                        if score is not None:
-                            st.metric(self.t("score"), f"{score}/10")
-                        else:
-                            st.metric(self.t("score"), "N/A")
-
+                    review = criterion_data.get("review", "")
                     if review:
-                        with st.container():
-                            st.text(self.t("review"))
+                        with st.expander(f"📝 Review for: {display_title}", expanded=False):
                             st.markdown(review)
-                else:
-                    # Simple score value
-                    if isinstance(criterion_data, (int, float)):
-                        col_score, col_name1 = st.columns([1, 3])
-                        with col_score:
-                            st.metric(self.t("score"), f"{criterion_data}/10")
-
-    def _display_legacy_criteria(self, criteria: Dict[str, Any]) -> None:
-        """Display criteria in legacy format.
+    
+    def _display_legacy_criteria_table(self, criteria: Dict[str, Any]) -> None:
+        """Display criteria in legacy format using table.
 
         Args:
             criteria: Dictionary of criteria with detailed information.
         """
+        table_data = []
         for criterion_name, criterion_data in criteria.items():
-            with st.expander(criterion_name, expanded=False):
+            if isinstance(criterion_data, dict):
+                score = criterion_data.get("score")
+                review = criterion_data.get("review", "")
+                diagnosis = criterion_data.get("diagnosis", "")
+                
+                score_display = f"{score:.1f}/10" if score is not None else "N/A"
+                
+                table_data.append({
+                    "Criterion Name": criterion_name,
+                    "Score": score_display,
+                    "Score System": "N/A",
+                    "Review": review[:100] + "..." if len(str(review)) > 100 else review,
+                    "Diagnosis": diagnosis[:100] + "..." if len(str(diagnosis)) > 100 else diagnosis,
+                })
+        
+        if table_data:
+            df = pd.DataFrame(table_data)
+            st.dataframe(df, width="stretch", hide_index=True)
+            
+            # Show detailed reviews in expandable sections
+            for criterion_name, criterion_data in criteria.items():
                 if isinstance(criterion_data, dict):
-                    score = criterion_data.get("score")
-                    review = criterion_data.get("review")
-                    diagnosis = criterion_data.get("diagnosis")
-
-                    col_score1, col_name1 = st.columns([1, 3])
-                    with col_score1:
-                        if score is not None:
-                            st.metric(self.t("score"), f"{score}/10")
-                        else:
-                            st.metric(self.t("score"), "N/A")
-
-                    if diagnosis:
-                        with st.container():
-                            st.text(self.t("diagnosis"))
-                            st.markdown(diagnosis)
-
-                    if review:
-                        with st.container():
-                            st.text(self.t("review"))
-                            st.markdown(review)
+                    review = criterion_data.get("review", "")
+                    diagnosis = criterion_data.get("diagnosis", "")
+                    if review or diagnosis:
+                        with st.expander(f"📝 Details for: {criterion_name}", expanded=False):
+                            if diagnosis:
+                                st.markdown(f"**Diagnosis:** {diagnosis}")
+                            if review:
+                                st.markdown(f"**Review:** {review}")

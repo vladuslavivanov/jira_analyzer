@@ -19,7 +19,6 @@ Output requirements:
 - For each criterion, include recommendations as an array of 1-3 specific suggestions based on the score for that criterion.
 - Put a compact score map into "criteria_scores" for downstream parsing.
 - criteria_scores values must mirror the matching criteria.*.score values.
-- Compute total_score as the average of all criteria_scores.
 - Aggregate all unique criterion recommendations into the top-level recommendations list.
 - Provide a list of recommendations for improving the issue description based on the analysis.
 - Do not add criteria that are not listed in the schema.

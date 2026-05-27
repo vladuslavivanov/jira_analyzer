@@ -109,7 +109,6 @@ TRANSLATIONS = {
         "failed_issue": "Failed to analyze this issue: {error}",
         "original_description": "Original Description",
         "no_description": "No description provided",
-        "overall_score": "Overall Score",
         "verdict": "Verdict",
         "criteria_breakdown": "Criteria Breakdown",
         "diagnosis": "Diagnosis",
@@ -222,7 +221,6 @@ TRANSLATIONS = {
         "failed_issue": "Не удалось проанализировать задачу: {error}",
         "original_description": "Исходное описание",
         "no_description": "Описание отсутствует",
-        "overall_score": "Общая оценка",
         "verdict": "Вердикт",
         "criteria_breakdown": "Оценки по критериям",
         "diagnosis": "Диагностика",
@@ -808,8 +806,6 @@ def _build_results_table(results: list[dict]) -> pd.DataFrame:
             "jira_key": result.get("jira_key") or result.get("key") or f"Issue {index}",
             "input_element_type": result.get("input_element_type", "N/A"),
         }
-        if "overall_score" in result:
-            row["overall_score"] = result["overall_score"]
         if "verdict" in result:
             row["verdict"] = result["verdict"]
         if "overall_conclusion" in result:

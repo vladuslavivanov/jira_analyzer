@@ -40,10 +40,6 @@ def get_default_fake_response() -> str:
         "criteria_scores": {
             "criterion_1": 85
         },
-        "total_score": {
-            "type": "number",
-            "description": "Overall score as average of all criteria scores"
-        },
         "recommendations": {
             "type": "array",
             "items": {"type": "string"},
@@ -88,10 +84,6 @@ def get_reseted_high_response() -> str:
         "criteria_scores": {
             "criterion_1": 90,
             "criterion_2": 85
-        },
-        "total_score": {
-            "type": "number",
-            "description": "Overall score as average of all criteria scores"
         },
         "recommendations": {
             "type": "array",
@@ -139,10 +131,6 @@ def get_risk_assessment_response() -> str:
             "criterion_1": 85,
             "criterion_2": 80
         },
-        "total_score": {
-            "type": "number",
-            "description": "Overall score as average of all criteria scores"
-        },
         "recommendations": {
             "type": "array",
             "items": {"type": "string"},
@@ -187,10 +175,6 @@ def get_task_definition_response() -> str:
         "criteria_scores": {
             "criterion_1": 90,
             "criterion_2": 1
-        },
-        "total_score": {
-            "type": "number",
-            "description": "Overall score as average of all criteria scores"
         },
         "recommendations": {
             "type": "array",
@@ -252,10 +236,6 @@ EXPECTED_SCHEMA = {
             "criterion_1": 85,
             "criterion_2": 75
         }
-    },
-    "total_score": {
-        "type": "number",
-        "description": "Overall score as average of all criteria scores"
     },
     "recommendations": {
         "type": "array",

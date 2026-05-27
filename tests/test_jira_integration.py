@@ -123,7 +123,7 @@ def test_cli_can_analyze_jira_issue_with_mock(
     def fake_run_analysis(issues, worker_count=1, split_by_criterion=False):
         assert issues[0]["jira_key"] == "YA-1"
         assert worker_count == 1
-        return [{"input_element_type": issues[0]["element_type"], "overall_score": 10}]
+        return [{"input_element_type": issues[0]["element_type"]}]
 
     monkeypatch.setattr(cli, "run_analysis", fake_run_analysis)
 
@@ -142,7 +142,7 @@ def test_cli_can_analyze_jira_issue_with_mock(
 
         assert exit_code == 0
         assert json.loads(output_file.read_text(encoding="utf-8")) == [
-            {"input_element_type": "Risk", "overall_score": 10}
+            {"input_element_type": "Risk"}
         ]
     finally:
         if output_file.exists():
@@ -166,7 +166,6 @@ def test_cli_can_analyze_jira_jql_with_mock(
             {
                 "jira_key": issue["jira_key"],
                 "input_element_type": issue["element_type"],
-                "overall_score": "5/5",
                 "verdict": "Accept",
             }
             for issue in issues

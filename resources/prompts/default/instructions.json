@@ -19,7 +19,6 @@
   },
   "schema_descriptions": {
     "criteria_recommendations": "1-3 specific recommendations for this criterion based on the score",
-    "total_score": "Overall score as the average of all criteria scores",
     "aggregated_recommendations": "Aggregated list of unique recommendations from all criteria",
     "overall_conclusion": "Overall conclusion for the issue.",
     "criterion_review": "Detailed review of this criterion from the analyzed perspective."

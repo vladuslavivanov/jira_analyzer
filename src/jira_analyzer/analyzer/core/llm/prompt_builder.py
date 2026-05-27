@@ -236,10 +236,6 @@ def _build_json_schema_text(
     schema = {
         "criteria": criteria_schema,
         "criteria_scores": score_schema,
-        "total_score": {
-            "type": "number",
-            "description": _SCHEMA_DESCRIPTIONS["total_score"]
-        },
         "recommendations": {
             "type": "array",
             "items": {

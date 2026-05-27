@@ -67,7 +67,6 @@ class SqliteAnalysisResultRepository(AnalysisResultRepository):
                     created_at TEXT,
                     updated_at TEXT,
                     state TEXT DEFAULT 'PENDING',
-                    total_score REAL,
                     summary TEXT,
                     recommendations TEXT,
                     raw_response TEXT,
@@ -129,18 +128,6 @@ class SqliteAnalysisResultRepository(AnalysisResultRepository):
         """Save the analysis result for a task."""
         now = datetime.now(timezone(timedelta(hours=3))).isoformat()
 
-        # Compute total_score as average of criteria_scores if available
-        total_score = None
-        criteria_scores = result.get("criteria_scores", {})
-        if criteria_scores:
-            scores = [
-                float(v)
-                for v in criteria_scores.values()
-                if isinstance(v, (int, float))
-            ]
-            if scores:
-                total_score = sum(scores) / len(scores)
-
         # Use overall_conclusion as summary for now
         summary = result.get("overall_conclusion", "")
         if not isinstance(summary, str):
@@ -158,14 +145,13 @@ class SqliteAnalysisResultRepository(AnalysisResultRepository):
                 """
                 UPDATE analysis_results 
                 SET state = 'COMPLETED',
-                    total_score = ?,
                     summary = ?,
                     recommendations = ?,
                     raw_response = ?,
                     analyzed_at = ?
                 WHERE task_id = ?
                 """,
-                (total_score, summary, recommendations, raw_response, now, task_id),
+                (summary, recommendations, raw_response, now, task_id),
             )
             conn.commit()
 
@@ -295,21 +281,6 @@ class SqliteAnalysisResultRepository(AnalysisResultRepository):
                 created_at = res.get("created_at", "")
                 updated_at = res.get("updated_at", now)
 
-                # Compute total_score
-                criteria_scores = res.get("criteria_scores", {})
-                if not criteria_scores:
-                    # Legacy, extract from criteria
-                    criteria = res.get("criteria", {})
-                    criteria_scores = {
-                        k: c["score"] for k, c in criteria.items() if "score" in c
-                    }
-                scores = [
-                    float(v)
-                    for v in criteria_scores.values()
-                    if isinstance(v, (int, float))
-                ]
-                total_score = sum(scores) / len(scores) if scores else None
-
                 summary = res.get("overall_conclusion", res.get("summary", ""))
                 if not isinstance(summary, str):
                     summary = json.dumps(summary)
@@ -325,8 +296,8 @@ class SqliteAnalysisResultRepository(AnalysisResultRepository):
                 conn.execute(
                     """
                     INSERT OR REPLACE INTO analysis_results 
-                    (task_id, title, description, status, assignee, created_at, updated_at, state, total_score, summary, recommendations, raw_response, analyzed_at)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, 'COMPLETED', ?, ?, ?, ?, ?)
+                    (task_id, title, description, status, assignee, created_at, updated_at, state, summary, recommendations, raw_response, analyzed_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, 'COMPLETED', ?, ?, ?, ?)
                     """,
                     (
                         task_id,
@@ -336,7 +307,6 @@ class SqliteAnalysisResultRepository(AnalysisResultRepository):
                         assignee,
                         created_at,
                         updated_at,
-                        total_score,
                         summary,
                         recommendations,
                         raw_response,

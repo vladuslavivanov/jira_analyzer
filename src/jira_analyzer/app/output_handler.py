@@ -23,8 +23,6 @@ class Statistics:
     """Calculated statistics for report generation."""
     total_scores: List[float] = field(default_factory=list)
     score_counts: List[int] = field(default_factory=list)
-    total_overall_score: float = 0.0
-    overall_score_count: int = 0
 
 
 def save_results(results: List[Dict[str, Any]], output_path: str) -> None:
@@ -155,8 +153,8 @@ def _calculate_statistics(
     """
     Calculate score statistics across all analyzed issues.
     
-    Computes totals and counts for each criterion and overall scores
-    to enable average calculations in the report.
+    Computes totals and counts for each criterion to enable average
+    calculations in the report.
     
     Args:
         results: List of analysis result dictionaries containing score data.
@@ -167,8 +165,6 @@ def _calculate_statistics(
     """
     total_scores: List[float] = [0.0] * len(criteria_info.keys)
     score_counts: List[int] = [0] * len(criteria_info.keys)
-    total_overall_score = 0.0
-    overall_score_count = 0
 
     for result in results:
         for score_index, criterion_key in enumerate(criteria_info.keys):
@@ -177,19 +173,9 @@ def _calculate_statistics(
                 total_scores[score_index] += score
                 score_counts[score_index] += 1
 
-        if "overall_score" in result:
-            overall_score = result["overall_score"]
-            if isinstance(overall_score, (int, float)) and not isinstance(
-                overall_score, bool
-            ):
-                total_overall_score += overall_score
-                overall_score_count += 1
-
     return Statistics(
         total_scores=total_scores,
         score_counts=score_counts,
-        total_overall_score=total_overall_score,
-        overall_score_count=overall_score_count,
     )
 
 
@@ -202,7 +188,7 @@ def _build_summary_table(
     Build the summary table with all issues and their scores.
     
     Creates a comprehensive markdown table showing issue keys, types,
-    individual criterion scores, overall scores, and verdicts.
+    individual criterion scores, and verdicts.
     
     Args:
         results: List of analysis result dictionaries.
@@ -215,11 +201,8 @@ def _build_summary_table(
     summary_headers = ["#", "Issue", "Type"]
     summary_headers.extend(criteria_info.titles)
     
-    has_overall_score = any("overall_score" in result for result in results)
     has_verdict = any("verdict" in result for result in results)
     
-    if has_overall_score:
-        summary_headers.append("Score")
     if has_verdict:
         summary_headers.append("Verdict")
 
@@ -237,18 +220,12 @@ def _build_summary_table(
             score = _extract_criterion_score_by_key(result, criterion_key)
             row.append(score if score is not None else "")
 
-        if has_overall_score:
-            if "overall_score" in result:
-                row.append(result["overall_score"])
-            else:
-                row.append("")
-
         if has_verdict:
             row.append(result.get("verdict", ""))
 
         lines.append(_markdown_table_row(row))
 
-    lines.append(_build_average_row(criteria_info, statistics, has_overall_score, has_verdict))
+    lines.append(_build_average_row(criteria_info, statistics, has_verdict))
 
     return "\n".join(lines)
 
@@ -256,7 +233,6 @@ def _build_summary_table(
 def _build_average_row(
     criteria_info: CriteriaInfo,
     statistics: Statistics,
-    has_overall_score: bool,
     has_verdict: bool
 ) -> str:
     """
@@ -265,7 +241,6 @@ def _build_average_row(
     Args:
         criteria_info: CriteriaInfo object with criteria keys.
         statistics: Statistics object with computed totals.
-        has_overall_score: Whether overall scores exist in results.
         has_verdict: Whether verdicts exist in results.
     
     Returns:
@@ -279,13 +254,6 @@ def _build_average_row(
             average_row.append(
                 str(int(average)) if average.is_integer() else f"{average:.2f}"
             )
-        else:
-            average_row.append("")
-
-    if has_overall_score:
-        if statistics.overall_score_count:
-            avg = statistics.total_overall_score / statistics.overall_score_count
-            average_row.append(str(int(avg)) if avg.is_integer() else f"{avg:.2f}")
         else:
             average_row.append("")
 
@@ -412,10 +380,6 @@ def _build_issue_details_section(
             lines.append(f"- Updated: {updated_at}")
             if _is_zombie_task(result):
                 lines.append("- **Zombie Task**: Not updated for 30+ days")
-
-        score = result.get("total_score") or result.get('analysis', {}).get('total_score', '')
-        if score:
-            lines.append(f"- Score: {score}")
 
         if "verdict" in result:
             lines.append(f"- Verdict: {result['verdict']}")
