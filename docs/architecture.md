@@ -1,203 +1,32 @@
-# Architecture Description
+# Architecture
 
-# 1. Architectural Overview
+Jira AI Analyzer is built as a lightweight modular monolith for AI-driven Jira issue evaluation. It combines a browser UI, AI analysis engine, Jira integration, and local persistence.
 
-The system is a modular AI-driven Jira task analysis platform designed for:
+## Layers and responsibilities
 
-* automated issue inspection,
-* multi-criteria AI evaluation,
-* local/offline experimentation,
-* simplified deployment.
+- **UI layer**: Streamlit browser app with prompt editor, issue source selector, workflow settings, results viewer, and export controls.
+- **Orchestration layer**: `AnalysisService` manages issue loading, analysis execution, batching, and persistence.
+- **AI layer**: `Analyzer` builds prompts, splits analysis by criteria if needed, and merges structured LLM responses.
+- **Integration layer**: Jira adapters normalize real Jira or mock Jira issues into internal issue objects.
+- **Persistence layer**: SQLite repository stores analysis results and task state.
 
-The architecture follows a layered component-oriented approach with:
+## Key components
 
-* presentation layer,
-* orchestration layer,
-* AI analysis layer,
-* integration layer,
-* persistence layer.
+- **Streamlit UI**: collects issue source settings (sample JSON, Jira issue key, JQL), Jira credentials, prompt configuration, and worker count, then starts analysis without direct database access.
+- **AnalysisService**: the central workflow owner that requests tasks, invokes the analyzer, and persists results.
+- **Analyzer**: prepares prompt content from configurable criteria and sends requests to an LLM provider.
+- **LLM providers**: supports `fake` mode for local testing and `openai-compatible` mode for production-style LLM calls.
+- **Jira client / task repository**: fetches and normalizes issues from Jira or local data sources.
+- **Mock Jira service**: optional local Jira-compatible API for offline development.
 
-The implementation intentionally simplifies several production concerns due to its research-oriented nature.
+## Behavior summary
 
----
+1. User submits a request from the Streamlit UI.
+2. AnalysisService loads issues via the task repository.
+3. Analyzer converts issues into prompt requests and sends them to the LLM provider.
+4. Results are collected, merged, and saved by the SQLite repository.
+5. The UI reads final results and presents JSON/Markdown output.
 
-# 2. Architectural Principles
-
-## 2.1 Separation of Responsibilities
-
-Responsibilities are distributed as follows:
-
-| Layer            | Responsibility          |
-| ---------------- | ----------------------- |
-| Web UI           | User interaction        |
-| Analysis Service | Workflow orchestration  |
-| Analyzer         | AI analysis logic       |
-| Adapters/Clients | External communication  |
-| Repositories     | Persistence abstraction |
-
----
-
-## 2.2 Simplified Monolithic Design
-
-The system is intentionally implemented as a lightweight modular monolith:
-
-* single backend process,
-* local SQLite storage,
-* embedded queue handling,
-* optional mock infrastructure.
-
-This reduces operational complexity while preserving architectural clarity.
-
----
-
-# 3. Component Responsibilities
-
-# 3.1 Web UI (Streamlit)
-
-## Responsibilities
-
-* collect user input,
-* display reports,
-* configure task tracker access,
-* trigger analysis requests.
-
-The UI does NOT directly access repositories or databases.
-
----
-
-# 3.2 Streamlit Web Service
-
-## Responsibilities
-
-Acts as:
-
-* HTTP/API controller,
-* bridge between UI and backend services.
-
-Responsibilities:
-
-* validate requests,
-* invoke analysis workflows,
-* request final results from Analysis Service.
-
----
-
-# 3.3 Analysis Service
-
-## Core Orchestration Layer
-
-Owns:
-
-* analysis workflow lifecycle,
-* task batching,
-* pending/completed state management,
-* aggregation of analysis results,
-* coordination between repositories and Analyzer.
-
-This is the primary orchestrator of the system.
-
----
-
-# 3.4 Analyzer
-
-## AI Analysis Engine
-
-Owns:
-
-* prompt preparation,
-* criteria decomposition,
-* semantic analysis execution,
-* merging partial LLM outputs.
-
-The Analyzer does NOT own:
-
-* workflow orchestration,
-* persistence,
-* concurrency management.
-
----
-
-# 3.5 LLM Client
-
-## Responsibilities
-
-Encapsulates all LLM-provider communication.
-
-Owns:
-
-* asynchronous request queue,
-* rate limiting,
-* retries,
-* timeout handling,
-* provider communication.
-
-This simplifies concurrency management by centralizing it in one component.
-
----
-
-# 3.6 Tasks Repository
-
-## Responsibilities
-
-Provides unified access to tasks regardless of source.
-
-Supports:
-
-* Jira API retrieval,
-* local dataset retrieval.
-
-The repository abstracts task acquisition from the orchestration layer.
-
----
-
-# 3.7 Task Tracker Adapter
-
-## Responsibilities
-
-Transforms external task-tracker data into normalized internal domain objects.
-
-This isolates:
-
-* Jira-specific schemas,
-* transport details,
-* external field mappings.
-
----
-
-# 3.8 Jira Client
-
-## Responsibilities
-
-Low-level communication with:
-
-* real Jira REST API,
-* mock Jira service.
-
-Handles:
-
-* HTTP requests,
-* serialization,
-* response parsing.
-
----
-
-# 3.9 Fake Tasks Storage
-
-## Responsibilities
-
-Stores mock Jira tasks in local storage.
-
-This replaces the earlier raw "JSON Dataset" abstraction.
-
-The storage format may internally still be JSON files, but architecturally it is treated as a storage subsystem rather than direct file access.
-
----
-
-# 3.10 Mock Jira Service
-
-## Responsibilities
-
-Provides a lightweight Jira-compatible REST API for:
 
 * local development,
 * offline testing,

@@ -1,121 +1,95 @@
 # Jira AI Analyzer
 
-Tool for automatic data collection and analysis of Jira task tracker with AI-driven quality estimation.
+A compact AI-powered Jira issue quality linter with a Streamlit browser interface.
 
-## Installation
+## What it does
 
-1. Clone the repository.
-2. Install dependencies using [uv](https://github.com/astral-sh/uv):
+- Analyze Jira issues or sample JSON for quality, verdicts, and recommendations.
+- Use a single issue key, JQL query, or local `data/input.json`.
+- Run in browser with Streamlit.
+- Export results as JSON and optional Markdown.
+- Support fake LLM responses for local testing or OpenAI-compatible providers for real analysis.
+
+## Setup
+
+1. Install dependencies:
    ```bash
    uv sync
    ```
-3. Create a `.env` file in the `jira_analyzer` directory and add your DeepSeek API key:
+2. Create a `.env` file in the repository root for provider and Jira settings:
    ```env
-   DEEPSEEK_API_KEY=your_api_key_here
+   LLM_PROVIDER_TYPE=fake
+   LLM_API_KEY=your_openai_api_key
+   LLM_BASE_URL=http://localhost:8000/v1
+   LLM_MODEL=your-model-name
+   JIRA_SERVER_URL=https://jira.example.com
+   JIRA_USERNAME=your-user
+   JIRA_API_TOKEN=your-token
    ```
+3. For local tests, use the sample input file: `data/input.json`.
 
-## Usage
+### Install with pip
 
-The project uses a unified entry point via `python -m jira_analyzer`.
-
-### Web User Interface (Streamlit)
-Launch the interactive browser-based UI:
+Install project dependencies with pip and editable mode:
 
 ```bash
-# as project script:
+python -m pip install --upgrade pip
+python -m pip install -e .
+python -m pip install -r requirements.txt
+```
+
+## Run
+
+### Streamlit UI
+
+```bash
 uv run jira-analyzer
+```
 
-# or as python module:
+Or, without uv:
+
+```bash
+python -m streamlit run src/jira_analyzer/app/streamlit.py
+```
+
+Or directly launch the package:
+
+```bash
 python -m jira_analyzer
-
-# or directly with streamlit:
-streamlit run src/jira_analyzer/app/streamlit.py
 ```
 
-Optional command line interface (CLI):
-```bash
-uv run python src/jira_analyzer/app/cli.py --input data/input.json --output data/output.json
-```
-
-Analyze a single Jira issue from the CLI:
+### Mock Jira
 
 ```bash
-uv run jira-analyzer --jira-server http://127.0.0.1:8081 --jira-issue YA-1 --jira-no-verify
-```
-
-Analyze Jira issues by JQL and export a Markdown report:
-```bash
-uv run jira-analyzer --jira-server http://127.0.0.1:8081 --jql "project = YA" --jira-no-verify --markdown-output data/report.md
-```
-
-Run analysis with multiple parallel workers:
-```bash
-uv run jira-analyzer --jira-server http://127.0.0.1:8081 --jql "project = YA" --jira-no-verify --workers 2
-```
-
-The Streamlit UI also supports Jira issue lookup in the sidebar.
-It can fetch either a single issue key or a JQL query, edit the LLM prompt before
-analysis, configure the number of parallel analysis workers, preview the
-Markdown report, and download JSON or Markdown results.
-
-### Local Mock Jira
-Launch a Jira-compatible mock REST API service:
-
-```bash
-# as project script:
 uv run mock-jira
-
-# or as python module:
-python -m mock_jira
 ```
 
-The server starts at `http://127.0.0.1:8081` and supports issue lookup by key:
+Then point the UI to `http://127.0.0.1:8081`.
 
-Mock issues live in `data/mock_jira_issues.json`. The default data contains `YA-1` and `YA-2` in this format:
-```json
-[
-  {
-    "key": "YA-1",
-    "element_type": "Risk",
-    "description": "Risk description"
-  }
-]
+### Docker Compose
+
+```bash
+docker compose up --build
 ```
 
-### Run with Docker
+Open the UI at `http://localhost:8501`.
 
-```sh
-# build image
-docker build -t jira-analyzer:latest .
+## Environment variables
 
-# run application
-docker run -t -p 8501:8501 jira-analyzer:latest
+- `LLM_PROVIDER_TYPE`: `fake` or `openai-compatible` (default: `fake`)
+- `LLM_API_KEY`: key for OpenAI-compatible providers
+- `LLM_BASE_URL`: API endpoint for OpenAI-compatible providers
+- `LLM_MODEL`: model name for LLM requests
+- `JIRA_SERVER_URL`, `JIRA_USERNAME`, `JIRA_API_TOKEN`: Jira credentials
 
-# run mock jira application
-docker run -t -p 8081:8081 jira-analyzer:latest sh -c "uv run mock-jira"
-```
+## Project structure
 
-## Documentation
+- `src/jira_analyzer/`: core application logic
+- `src/mock_jira/`: local Jira-compatible mock service
+- `data/`: sample JSON and output files
+- `docs/`: architecture and design notes
+- `tests/`: automated tests
 
-For detailed technical specifications and architectural documentation, see the `docs/` directory:
+## Docs
 
-- `architecture.md` - System architecture and component responsibilities
-- [`prompt-template-system.md`](docs/prompt-template-system.md) - Complete guide to the flexible prompt template system, including customization examples and criteria configuration
-- `requirements_spec.md` - Project requirements and specifications
-- `design_spec.md` - Detailed design document
-- `sequence_diagram.md` - System interaction sequences
-
-## Project Structure
-
-- `src/`
-  - jira_analyzer/`: Core package logic.
-    - `analyzer/`: AI analysis engine and prompt templates.
-    - `tasktracker/`: Jira data parsing and extraction.
-    - `app/`: Analyzer application.
-      - `streamlit.py`: Streamlit web application.
-      - `cli.py`: Command-line interface logic.
-  - `mock_jira/`: Local Jira REST API mock for development.
-- `resources/prompts/`: Template files for AI analysis configuration.
-- `docs/`: Technical documentation and architecture guides.
-- `data/`: Sample input and output JSON files.
-- `tests/`: Quality assurance suite.
+See `docs/architecture.md` and `docs/sequence_diagram.md` for system design details.
