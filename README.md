@@ -68,11 +68,48 @@ Then point the UI to `http://127.0.0.1:8081`.
 
 ### Docker Compose
 
+Start both analyzer and mock Jira services:
+
 ```bash
 docker compose up --build
 ```
 
+The setup uses environment variables to configure the LLM provider and Jira connection. By default:
+- **LLM provider**: `openai-compatible` (requires `LLM_API_KEY`)
+- **LLM base URL**: `https://api.deepseek.com/v1`
+- **LLM model**: `deepseek-chat`
+- **Jira server**: `http://mock-jira:8081` (internal Docker network)
+
+#### Using with OpenAI-compatible LLM
+
+Create a `.env` file to provide the API key:
+
+```env
+LLM_API_KEY=your_api_key_here
+```
+
+Then start:
+
+```bash
+docker compose up --build
+```
+
+Or set the key via shell environment:
+
+```bash
+LLM_API_KEY=your_api_key_here docker compose up --build
+```
+
+#### Using with fake LLM for testing
+
+Override the provider to fake mode:
+
+```bash
+LLM_PROVIDER_TYPE=fake docker compose up --build
+```
+
 Open the UI at `http://localhost:8501`.
+
 
 ## Environment variables
 

@@ -1,5 +1,6 @@
 import json
 from pathlib import Path
+import os
 
 import pandas as pd
 import streamlit as st
@@ -1018,7 +1019,7 @@ def main() -> None:
     with st.sidebar.expander(t("connection"), expanded=False):
         jira_server = st.text_input(
             t("jira_server_url"),
-            value="http://127.0.0.1:8081",
+            value=os.getenv("JIRA_SERVER_URL", "http://127.0.0.1:8081"),
         )
         jira_username = st.text_input(t("jira_username"))
         jira_token = st.text_input(t("jira_token"), type="password")

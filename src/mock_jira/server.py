@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qs, unquote, urlparse
 
-DEFAULT_HOST = "127.0.0.1"
+DEFAULT_HOST = "0.0.0.0"
 DEFAULT_PORT = 8081
 DEFAULT_DATA_FILE = (
     Path(__file__).resolve().parents[2] / "data" / "mock_jira_issues.json"

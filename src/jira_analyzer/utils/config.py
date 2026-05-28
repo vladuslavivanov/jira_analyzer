@@ -1,7 +1,9 @@
 import os
 from dotenv import load_dotenv
 
-load_dotenv()
+# Only load .env if it exists and don't override existing env vars set by Docker
+# This allows Docker compose environment variables to take precedence
+load_dotenv(override=False)
 
 # Provider-agnostic LLM configuration
 LLM_PROVIDER_TYPE = os.getenv("LLM_PROVIDER_TYPE", "fake")
