@@ -1,0 +1,17 @@
+version: '3.9'
+
+services:
+  jira-analyzer:
+    build: .
+    ports:
+      - '8501:8501'
+    environment:
+      - LLM_PROVIDER_TYPE=fake
+      - LLM_FAKE_SCENARIO=default
+    command: uv run jira-analyzer
+
+  mock-jira:
+    build: .
+    ports:
+      - '8081:8081'
+    command: uv run mock-jira
