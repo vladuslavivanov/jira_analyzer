@@ -4,7 +4,6 @@ import json
 import sys
 import threading
 import types
-from pathlib import Path
 from urllib.parse import quote
 from urllib.request import urlopen
 
