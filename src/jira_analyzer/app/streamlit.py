@@ -393,6 +393,7 @@ def _build_prompt_config_export() -> dict:
         "criteria": [
             {
                 "title": str(criterion.get("title", "")),
+                "key": str(criterion.get("key", "")),
                 "description": str(criterion.get("description", "")),
                 "scoring_system": _normalize_scoring_system(
                     criterion.get("scoring_system", "percent")
@@ -418,6 +419,7 @@ def _normalize_prompt_config(config: dict) -> dict:
         imported_criteria.append(
             {
                 "title": str(criterion.get("title", "")),
+                "key": str(criterion.get("title", "")),
                 "description": str(criterion.get("description", "")),
                 "scoring_system": _normalize_scoring_system(
                     criterion.get("scoring_system", "percent")
@@ -611,6 +613,7 @@ def _render_prompt_editor(t) -> AnalysisPromptConfig:
             description=str(criterion.get("description", "")),
             scoring_system=criterion.get("scoring_system", "percent"),
             include_review=bool(criterion.get("include_review", False)),
+            key=str(criterion.get("key", None)),
         )
         for criterion in st.session_state.analysis_criteria
     ]
@@ -645,6 +648,7 @@ def _ensure_prompt_state() -> None:
         st.session_state.analysis_criteria = [
             {
                 "title": criterion.title,
+                "key": criterion.key,
                 "description": criterion.description,
                 "scoring_system": criterion.scoring_system,
                 "include_review": criterion.include_review,
