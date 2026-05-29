@@ -15,8 +15,8 @@
   - 
 - [x] load final prompt template from resource file for easier updating
 - [x] add dubug logging of sent requests and recieved responses
-- [ ] docker compose config
+- [x] docker compose config
 - [ ] add hints to prompt configuration UI: like "must describe scoring system: what is bad, what is good", general recommendations of prompt engeneering, etc.
 - [x] ensure independence from Deepseek LLM provider. Should be able easily add new LLM Provider
-- [ ] LLM reasoning setting
+- [x] LLM reasoning setting
 - [ ] extract localization configuratino to resource file
