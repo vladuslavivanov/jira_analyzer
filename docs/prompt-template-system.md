@@ -102,46 +102,6 @@ Placeholder:
 
 The template system follows a strict fail-fast approach to ensure data integrity and prevent silent failures:
 
-### Error Handling
-
-* **Missing template files**: Immediate `FileNotFoundError`
-  - Template files must exist at their expected paths
-  - Create directory structure before starting
-  - No auto-creation of missing files
-
-* **Missing JSON configurations**: Immediate `FileNotFoundError`
-  - `criteria-config.json` must exist in `default/` directory
-  - `instructions.json` must exist in `default/` directory
-  - Properly formatted JSON is required
-
-* **Missing instruction data**: Immediate `KeyError`
-  - All required keys must be present in JSON files
-  - No default values or fallback content
-  - Data must be complete and valid
-
-* **No fallback mechanisms**: The system does not provide fallback messages or default templates
-  - All content must be explicitly defined in files
-  - Missing data causes immediate failure
-  - This forces proper configuration and prevents silent failures
-
-### Benefits of Fail-Fast Approach
-
-* **Early error detection**: Configuration problems are caught immediately
-* **No silent failures**: Missing data never results in incorrect behavior
-* **Clear error messages**: Specific error types help identify issues quickly
-* **Configuration integrity**: Ensures all required data is properly specified
-* **Maintainability**: Forces attention to proper setup from the start
-
-### Language Requirement
-
-**All content must be in English only**
-
-* Template files: English content required
-* JSON configurations: English keys and values required
-* Instruction text: English only
-* No multilingual content or character sets
-* LLM responses will be in English by default
-
 ### Setup Requirements
 
 Ensure complete file structure before using the system:
