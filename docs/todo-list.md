@@ -20,3 +20,14 @@
 - [x] ensure independence from Deepseek LLM provider. Should be able easily add new LLM Provider
 - [x] LLM reasoning setting
 - [ ] extract localization configuratino to resource file
+
+- [ ] experiments:
+  - analyse AI model value:
+    - multiple runs for:
+      - models: deepseek & GLM
+      - single prompt
+      - split-criteria prompt
+      - reasoning-mode
+    - to collect data:
+      - criteria score (variance)
+      - total tokens consumption
