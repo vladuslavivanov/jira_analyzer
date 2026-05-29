@@ -39,7 +39,6 @@ def test_markdown_report_keeps_legacy_fields_when_present():
             {
                 "jira_key": "YA-2",
                 "input_element_type": "Task",
-                "overall_score": 85,
                 "verdict": "Accept",
                 "diagnosis": "Clear enough.",
                 "recommendations": "Keep details current.",
@@ -47,8 +46,8 @@ def test_markdown_report_keeps_legacy_fields_when_present():
         ]
     )
 
-    assert "| # | Issue | Type | Score | Verdict |" in report
-    assert "| 1 | YA-2 | Task | 85 | Accept |" in report
+    assert "| # | Issue | Type | Verdict |" in report
+    assert "| 1 | YA-2 | Task | Accept |" in report
     pass  # Score is in summary table, not details for legacy
     assert "- Verdict: Accept" in report
     assert "Clear enough." in report

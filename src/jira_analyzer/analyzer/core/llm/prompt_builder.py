@@ -1,9 +1,16 @@
+import json
 import re
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Literal, TextIO
 
-
 ScoringSystem = Literal["binary", "percent", "five"]
+
+# Template loading paths
+_PACKAGE_DIR = Path(__file__).parent.parent.parent.parent.parent.parent
+_TEMPLATES_DIR = _PACKAGE_DIR / "resources" / "prompts"
+_DEFAULT_CONFIG_PATH = _TEMPLATES_DIR / "default" / "criteria-config.json"
+_INSTRUCTIONS_PATH = _TEMPLATES_DIR / "default" / "instructions.json"
 
 
 @dataclass
@@ -23,37 +30,60 @@ class AnalysisPromptConfig:
     include_overall_conclusion: bool = True
 
 
-DEFAULT_SYSTEM_PROMPT = (
-    "You are a strict but constructive Jira issue quality analyst. "
-    "Return only valid JSON that matches the requested schema."
-)
+# Template loading functions
+def _load_template(relative_path: str) -> str:
+    """Load a template file from the resources directory."""
+    template_path = _TEMPLATES_DIR / relative_path
+    
+    if not template_path.exists():
+        raise FileNotFoundError(f"Template file not found: {template_path}")
+    
+    return template_path.read_text(encoding="utf-8").strip()
 
-DEFAULT_GENERAL_PROMPT = (
-    "Analyze the issue description. Evaluate whether it is clear, complete, "
-    "measurable, and suitable for the specified issue type."
-)
 
-DEFAULT_CRITERIA = [
-    CriterionConfig(
-        title="Completeness and specificity",
-        description=(
-            "Check whether the issue contains concrete names, links, versions, "
-            "API signatures, expected behavior, and enough context to act on it."
-        ),
-        scoring_system="percent",
-        include_review=True,
-    ),
-    CriterionConfig(
-        title="Measurability and acceptance criteria",
-        description=(
-            "Check whether the issue has measurable success conditions. For a "
-            "Task, look for DoD or a verifiable result. For a Risk, look for "
-            "probability, impact, and a mitigation plan."
-        ),
-        scoring_system="percent",
-        include_review=True,
-    ),
-]
+def _load_criteria_config() -> list[CriterionConfig]:
+    """Load default criteria configuration from JSON file."""
+    if not _DEFAULT_CONFIG_PATH.exists():
+        raise FileNotFoundError(f"Criteria configuration file not found: {_DEFAULT_CONFIG_PATH}")
+    
+    try:
+        with open(_DEFAULT_CONFIG_PATH, encoding="utf-8") as f:
+            criteria_data = json.load(f)
+        return [CriterionConfig(**criterion) for criterion in criteria_data]
+    except (json.JSONDecodeError, TypeError, ValueError) as e:
+        raise ValueError(f"Invalid criteria configuration file: {e}") from e
+
+
+def _load_instructions() -> dict[str, dict[str, str]]:
+    """Load instruction strings from JSON file."""
+    if not _INSTRUCTIONS_PATH.exists():
+        raise FileNotFoundError(f"Instructions configuration file not found: {_INSTRUCTIONS_PATH}")
+    
+    try:
+        with open(_INSTRUCTIONS_PATH, encoding="utf-8") as f:
+            return json.load(f)
+    except (json.JSONDecodeError, TypeError, ValueError) as e:
+        raise ValueError(f"Invalid instructions configuration file: {e}") from e
+
+
+# Load templates from files
+DEFAULT_SYSTEM_PROMPT = _load_template("system-prompt.md")
+DEFAULT_GENERAL_PROMPT = _load_template("general-prompt.md")
+STRUCTURED_ANALYSIS_TEMPLATE = _load_template("structured-analysis-prompt.md")
+CRITERION_FORMAT_TEMPLATE = _load_template("templates/criterion-format.md")
+
+# Load default criteria from JSON configuration
+DEFAULT_CRITERIA = _load_criteria_config()
+
+# Load all instruction strings from JSON
+_INSTRUCTIONS = _load_instructions()
+
+# Get specific instruction sets from loaded data
+_SCORING_INSTRUCTIONS = _INSTRUCTIONS["scoring_instructions"]
+_SCORE_SCHEMA_LABELS = _INSTRUCTIONS["score_schema_labels"]
+_OVERALL_INSTRUCTIONS = _INSTRUCTIONS["overall_instructions"]
+_REVIEW_INSTRUCTIONS = _INSTRUCTIONS["review_instructions"]
+_SCHEMA_DESCRIPTIONS = _INSTRUCTIONS["schema_descriptions"]
 
 
 def build_prompt_from_template(
@@ -94,44 +124,20 @@ def build_structured_prompt(
         criterion_keys,
     )
     overall_instruction = (
-        "Also include the overall_conclusion field."
+        _OVERALL_INSTRUCTIONS["include"]
         if config.include_overall_conclusion
-        else "Do not include an overall_conclusion field."
+        else _OVERALL_INSTRUCTIONS["exclude"]
     )
 
-    return f"""Issue type:
-{element_type}
+    # Use loaded template with placeholder replacement
+    prompt = STRUCTURED_ANALYSIS_TEMPLATE.replace("{element_type}", str(element_type))
+    prompt = prompt.replace("{description}", str(description))
+    prompt = prompt.replace("{general_prompt}", str(config.general_prompt))
+    prompt = prompt.replace("{criteria_block}", str(criteria_block))
+    prompt = prompt.replace("{overall_instruction}", str(overall_instruction))
+    prompt = prompt.replace("{json_schema}", str(schema))
 
-Issue description:
-{description}
-
-General analysis prompt:
-{config.general_prompt}
-
-Criteria:
-{criteria_block if criteria_block else "No separate criteria were provided."}
-
-Output requirements:
-- Return only valid JSON. Do not include markdown or explanatory text outside JSON.
-- Follow the JSON schema below exactly and keep the exact criterion ids.
-- Put every criterion result into the top-level "criteria" object.
-- Each criterion result must include title, description, scoring_system, and score.
-- Include a criterion review field only when that criterion explicitly asks for it.
-- For each criterion, include recommendations as an array of 1-3 specific suggestions based on the score for that criterion.
-- Put a compact score map into "criteria_scores" for downstream parsing.
-- criteria_scores values must mirror the matching criteria.*.score values.
-- Compute total_score as the average of all criteria_scores.
-- Aggregate all unique criterion recommendations into the top-level recommendations list.
-- Provide a list of recommendations for improving the issue description based on the analysis.
-- Do not add criteria that are not listed in the schema.
-- For binary criteria, score must be 0 or 1.
-- For percent criteria, score must be an integer from 0 to 100.
-- For five-point criteria, score must be an integer from 0 to 5.
-- {overall_instruction}
-
-JSON schema to follow:
-{schema}
-"""
+    return prompt
 
 
 def get_default_prompt_config() -> AnalysisPromptConfig:
@@ -182,20 +188,23 @@ def _criterion_key_map(criteria: list[CriterionConfig]) -> list[str]:
 
 
 def _format_criterion(index: int, criterion: CriterionConfig, key: str) -> str:
-    scale = _scoring_instruction(criterion.scoring_system)
+    scoring_instruction_text = _scoring_instruction(criterion.scoring_system)
     review_instruction = (
-        "Include a review field with a concise review from this criterion perspective."
+        _REVIEW_INSTRUCTIONS["include"]
         if criterion.include_review
-        else "Do not include a review field for this criterion."
+        else _REVIEW_INSTRUCTIONS["exclude"]
     )
-    return (
-        f"{index}. id: {key}\n"
-        f"   title: {criterion.title}\n"
-        f"   description: {criterion.description}\n"
-        f"   scoring_system: {criterion.scoring_system}\n"
-        f"   score: {scale}\n"
-        f"   review: {review_instruction}"
-    )
+    
+    # Use loaded template with placeholder replacement
+    formatted = CRITERION_FORMAT_TEMPLATE.replace("{criterion_index}", str(index))
+    formatted = formatted.replace("{criterion_key}", str(key))
+    formatted = formatted.replace("{criterion_title}", str(criterion.title))
+    formatted = formatted.replace("{criterion_description}", str(criterion.description))
+    formatted = formatted.replace("{criterion_scoring_system}", str(criterion.scoring_system))
+    formatted = formatted.replace("{scoring_instruction}", str(scoring_instruction_text))
+    formatted = formatted.replace("{review_instruction}", str(review_instruction))
+
+    return formatted
 
 
 def _build_json_schema_text(
@@ -215,11 +224,11 @@ def _build_json_schema_text(
             "score": 0,
         }
         if criterion.include_review:
-            criterion_result["review"] = "Criterion-specific review."
+            criterion_result["review"] = _SCHEMA_DESCRIPTIONS["criterion_review"]
         criterion_result["recommendations"] = {
             "type": "array",
             "items": {"type": "string"},
-            "description": "1-3 specific recommendations for this criterion based on the score"
+            "description": _SCHEMA_DESCRIPTIONS["criteria_recommendations"]
         }
         criteria_schema[key] = criterion_result
         score_schema[key] = _score_schema_label(criterion.scoring_system)
@@ -227,37 +236,25 @@ def _build_json_schema_text(
     schema = {
         "criteria": criteria_schema,
         "criteria_scores": score_schema,
-        "total_score": {
-            "type": "number",
-            "description": "Overall score as the average of all criteria scores"
-        },
         "recommendations": {
             "type": "array",
             "items": {
                 "type": "string"
             },
-            "description": "Aggregated list of unique recommendations from all criteria"
+            "description": _SCHEMA_DESCRIPTIONS["aggregated_recommendations"]
         },
     }
     if include_overall_conclusion:
-        schema["overall_conclusion"] = "Overall conclusion for the issue."
-
-    import json
+        schema["overall_conclusion"] = _SCHEMA_DESCRIPTIONS["overall_conclusion"]
 
     return json.dumps(schema, ensure_ascii=False, indent=2)
 
 
 def _scoring_instruction(scoring_system: ScoringSystem) -> str:
-    if scoring_system == "binary":
-        return "0 or 1, where 0 means the criterion is not met and 1 means it is met"
-    if scoring_system == "five":
-        return "0 to 5, where 0 means not met and 5 means fully met"
-    return "0 to 100, where the value is the percent of criterion fulfillment"
+    """Get scoring instruction from lookup dictionary."""
+    return _SCORING_INSTRUCTIONS[scoring_system]
 
 
 def _score_schema_label(scoring_system: ScoringSystem) -> str:
-    if scoring_system == "binary":
-        return "0/1"
-    if scoring_system == "five":
-        return "0-5"
-    return "0-100"
+    """Get score schema label from lookup dictionary."""
+    return _SCORE_SCHEMA_LABELS[scoring_system]

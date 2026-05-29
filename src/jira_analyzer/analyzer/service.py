@@ -3,6 +3,9 @@ import re
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List
 
+import asyncio
+
+from jira_analyzer.analyzer.core.llm.adapter import SyncToAsyncLLMAdapter
 from jira_analyzer.analyzer.core.llm.client import LLMClient
 from jira_analyzer.analyzer.core.llm.prompt_builder import (
     AnalysisPromptConfig,
@@ -12,6 +15,7 @@ from jira_analyzer.analyzer.core.llm.prompt_builder import (
 )
 from jira_analyzer.analyzer.core.llm.provider import LLMProvider
 from jira_analyzer.app.output_handler import build_markdown_report
+from jira_analyzer.providers import ProviderFactory
 from jira_analyzer.tasktracker.jira import JiraConnectionConfig
 from jira_analyzer.tasktracker.repository import (
     JiraTasksRepository,
@@ -19,7 +23,7 @@ from jira_analyzer.tasktracker.repository import (
     TasksRepository,
 )
 from jira_analyzer.storage import AnalysisResultRepository
-import asyncio
+from jira_analyzer.utils.config import resolve_llm_config
 from jira_analyzer.utils.logger import setup_logger
 
 logger = setup_logger(__name__)
@@ -38,6 +42,9 @@ class AnalysisService:
         split_by_criterion: bool = False,
         task_repository: TasksRepository | None = None,
         repo: AnalysisResultRepository | None = None,
+        run_id: int | None = None,
+        reasoning_enabled: bool = False,
+        reasoning_effort: str = "high",
     ):
         self.prompt_template = prompt_template
         self.prompt_config = prompt_config
@@ -45,15 +52,59 @@ class AnalysisService:
         self.split_by_criterion = split_by_criterion
         self.task_repository = task_repository
         self.repo = repo
+        self.run_id = run_id
+        self.reasoning_enabled = reasoning_enabled
+        self.reasoning_effort = reasoning_effort
 
         if self.prompt_config is None and self.prompt_template is None:
             self.prompt_config = get_default_prompt_config()
 
-        provider = llm_provider or self._resolve_default_provider()
+        provider = llm_provider or self._resolve_default_provider(reasoning_enabled, reasoning_effort)
         self.llm_client = LLMClient(
             provider=provider,
             max_workers=llm_max_workers or self.worker_count,
         )
+
+    def create_analysis_run(
+        self,
+        run_name: str | None = None,
+    ) -> int:
+        """Create a new analysis run and store the analysis configuration."""
+        if not self.repo:
+            raise ValueError("Repository required to create analysis run")
+        
+        if not self.prompt_config:
+            raise ValueError("Prompt configuration required to create analysis run")
+        
+        # Convert criteria to dict format for storage
+        criteria_list = [
+            {
+                "title": criterion.title,
+                "description": criterion.description,
+                "scoring_system": criterion.scoring_system,
+                "include_review": criterion.include_review,
+                "key": criterion.key,
+            }
+            for criterion in self.prompt_config.criteria
+        ]
+        
+        # Create the analysis run
+        run_id = self.repo.create_analysis_run(
+            run_name=run_name,
+            system_prompt=self.prompt_config.system_prompt,
+            general_prompt=self.prompt_config.general_prompt,
+            include_overall_conclusion=self.prompt_config.include_overall_conclusion,
+            split_by_criterion=self.split_by_criterion,
+            reasoning_enabled=self.reasoning_enabled,
+            reasoning_effort=self.reasoning_effort,
+        )
+        
+        # Store the criteria for this run
+        self.repo.save_criteria(run_id, criteria_list)
+        
+        # Update the service to use this run
+        self.run_id = run_id
+        return run_id
 
     def _resolve_task_repository(
         self,
@@ -119,40 +170,41 @@ class AnalysisService:
             return build_markdown_report(results)
         return json.dumps(results, ensure_ascii=False, indent=2)
 
-    def _resolve_default_provider(self) -> LLMProvider:
-        import importlib
-
-        deepseek_module = importlib.import_module(
-            "jira_analyzer.analyzer.core.llm.deepseek_provider"
-        )
-
-        provider_class = getattr(deepseek_module, "DeepSeekProvider", None)
-        if provider_class is not None:
-            return provider_class()
-
-        send_prompt = getattr(deepseek_module, "send_prompt", None)
-        if callable(send_prompt):
-            class _LegacySendPromptProvider(LLMProvider):
-                def send_prompt(
-                    self,
-                    prompt: str,
-                    system_prompt: str | None = None,
-                ) -> dict[str, Any]:
-                    return send_prompt(prompt, system_prompt)
-
-            return _LegacySendPromptProvider()
-
-        raise ImportError(
-            "Could not resolve a default LLM provider from deepseek_provider. "
-            "Make sure the module exposes DeepSeekProvider or send_prompt()."
-        )
+    def _resolve_default_provider(self, reasoning_enabled: bool | None = None, reasoning_effort: str | None = None) -> LLMProvider:
+        """Resolve default LLM provider using the new provider agnostic architecture.
+        
+        Uses ProviderFactory to create sync provider and wraps it in adapter
+        for compatibility with the async AnalysisService infrastructure.
+        
+        Args:
+            reasoning_enabled: Optional override for reasoning mode
+            reasoning_effort: Optional override for reasoning effort level
+        
+        Returns:
+            LLMProvider instance compatible with async LLMClient
+        """
+        try:
+            # Get provider configuration from environment with optional UI overrides
+            provider_config = resolve_llm_config(reasoning_enabled, reasoning_effort)
+            
+            # Create synchronous provider using factory
+            sync_provider = ProviderFactory.create_provider(provider_config)
+            
+            # Wrap synchronous provider in async adapter
+            return SyncToAsyncLLMAdapter(sync_provider)
+            
+        except Exception as error:
+            raise ImportError(
+                f"Could not resolve default LLM provider: {error}. "
+                "Ensure LLM_PROVIDER_TYPE and related environment variables are set."
+            ) from error
 
     async def _async_analyze_issues(self, issues: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         total = len(issues)
         if self.repo:
             for idx, issue in enumerate(issues, start=1):
                 task_id = issue.get("key") or issue.get("jira_key") or f"local_{idx}"
-                await asyncio.to_thread(self.repo.save_pending, task_id, issue)
+                await asyncio.to_thread(self.repo.save_pending, task_id, issue, self.run_id)
 
         sem = asyncio.Semaphore(self.worker_count)
 
@@ -287,6 +339,9 @@ class AnalysisService:
         element_type: str,
         description: str,
     ) -> Dict[str, Any]:
+        if not self.prompt_config:
+            raise ValueError("Prompt configuration required for criteria split analysis")
+            
         criteria_requests: list[tuple[str, str | None]] = []
         for criterion in self.prompt_config.criteria:
             single_prompt_config = AnalysisPromptConfig(

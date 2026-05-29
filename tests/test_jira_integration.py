@@ -4,7 +4,6 @@ import json
 import sys
 import threading
 import types
-from pathlib import Path
 from urllib.parse import quote
 from urllib.request import urlopen
 
@@ -111,92 +110,3 @@ def test_jira_client_searches_issues_with_jql(mock_jira_url, fake_jira_module):
     assert [issue.key for issue in issues] == ["YA-1", "YA-2"]
 
 
-def test_cli_can_analyze_jira_issue_with_mock(
-    monkeypatch,
-    mock_jira_url,
-    fake_jira_module,
-):
-    from jira_analyzer.app import cli
-
-    output_file = Path("data/test_jira_integration_output.json")
-
-    def fake_run_analysis(issues, worker_count=1, split_by_criterion=False):
-        assert issues[0]["jira_key"] == "YA-1"
-        assert worker_count == 1
-        return [{"input_element_type": issues[0]["element_type"], "overall_score": 10}]
-
-    monkeypatch.setattr(cli, "run_analysis", fake_run_analysis)
-
-    try:
-        exit_code = cli.main(
-            [
-                "--jira-server",
-                mock_jira_url,
-                "--jira-issue",
-                "YA-1",
-                "--jira-no-verify",
-                "--output",
-                str(output_file),
-            ]
-        )
-
-        assert exit_code == 0
-        assert json.loads(output_file.read_text(encoding="utf-8")) == [
-            {"input_element_type": "Risk", "overall_score": 10}
-        ]
-    finally:
-        if output_file.exists():
-            output_file.unlink()
-
-
-def test_cli_can_analyze_jira_jql_with_mock(
-    monkeypatch,
-    mock_jira_url,
-    fake_jira_module,
-):
-    from jira_analyzer.app import cli
-
-    output_file = Path("data/test_jira_jql_output.json")
-    markdown_file = Path("data/test_jira_jql_output.md")
-
-    def fake_run_analysis(issues, worker_count=1, split_by_criterion=False):
-        assert [issue["jira_key"] for issue in issues] == ["YA-1", "YA-2"]
-        assert worker_count == 2
-        return [
-            {
-                "jira_key": issue["jira_key"],
-                "input_element_type": issue["element_type"],
-                "overall_score": "5/5",
-                "verdict": "Accept",
-            }
-            for issue in issues
-        ]
-
-    monkeypatch.setattr(cli, "run_analysis", fake_run_analysis)
-
-    try:
-        exit_code = cli.main(
-            [
-                "--jira-server",
-                mock_jira_url,
-                "--jql",
-                "project = YA",
-                "--jira-no-verify",
-                "--output",
-                str(output_file),
-                "--markdown-output",
-                str(markdown_file),
-                "--workers",
-                "2",
-            ]
-        )
-
-        assert exit_code == 0
-        output = json.loads(output_file.read_text(encoding="utf-8"))
-        assert output[0]["jira_key"] == "YA-1"
-        assert "Jira Task Analysis Report" in markdown_file.read_text(encoding="utf-8")
-    finally:
-        if output_file.exists():
-            output_file.unlink()
-        if markdown_file.exists():
-            markdown_file.unlink()

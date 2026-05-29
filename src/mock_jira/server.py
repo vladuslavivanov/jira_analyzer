@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qs, unquote, urlparse
 
-DEFAULT_HOST = "127.0.0.1"
+DEFAULT_HOST = "0.0.0.0"
 DEFAULT_PORT = 8081
 DEFAULT_DATA_FILE = (
     Path(__file__).resolve().parents[2] / "data" / "mock_jira_issues.json"
@@ -206,6 +206,16 @@ def make_handler(issues: dict[str, dict[str, Any]]) -> type[BaseHTTPRequestHandl
 
             issue_key = self._extract_issue_key(path_parts)
             if issue_key is not None:
+                # Return bad request for "error" issue key
+                if issue_key.upper() == "ERROR":
+                    self._send_json(
+                        {
+                            "errorMessages": ["Bad request"],
+                            "errors": {},
+                        },
+                        status=HTTPStatus.BAD_REQUEST,
+                    )
+                    return
                 issue = issues.get(issue_key.upper())
                 if issue is None:
                     self._send_json(
@@ -235,6 +245,10 @@ def make_handler(issues: dict[str, dict[str, Any]]) -> type[BaseHTTPRequestHandl
                         "active": True,
                     }
                 )
+                return
+
+            if self._is_field_path(path_parts):
+                self._send_fields_list()
                 return
 
             self._send_json(
@@ -296,6 +310,15 @@ def make_handler(issues: dict[str, dict[str, Any]]) -> type[BaseHTTPRequestHandl
             )
 
         @staticmethod
+        def _is_field_path(path_parts: list[str]) -> bool:
+            return (
+                len(path_parts) == 4
+                and path_parts[:2] == ["rest", "api"]
+                and path_parts[2] in {"2", "3", "latest"}
+                and path_parts[3] == "field"
+            )
+
+        @staticmethod
         def _is_search_path(path_parts: list[str]) -> bool:
             return (
                 len(path_parts) == 4
@@ -315,27 +338,166 @@ def make_handler(issues: dict[str, dict[str, Any]]) -> type[BaseHTTPRequestHandl
                 return path_parts[4]
             return None
 
+        def _send_fields_list(self) -> None:
+            fields = [
+                {
+                    "id": "summary",
+                    "name": "Summary",
+                    "custom": False,
+                    "orderable": True,
+                    "navigable": True,
+                    "searchable": True,
+                    "schema": {
+                        "type": "string",
+                        "system": "summary"
+                    }
+                },
+                {
+                    "id": "description",
+                    "name": "Description",
+                    "custom": False,
+                    "orderable": True,
+                    "navigable": True,
+                    "searchable": True,
+                    "schema": {
+                        "type": "string",
+                        "system": "description"
+                    }
+                },
+                {
+                    "id": "status",
+                    "name": "Status",
+                    "custom": False,
+                    "orderable": True,
+                    "navigable": True,
+                    "searchable": True,
+                    "schema": {
+                        "type": "status",
+                        "system": "status"
+                    }
+                },
+                {
+                    "id": "issuetype",
+                    "name": "Issue Type",
+                    "custom": False,
+                    "orderable": True,
+                    "navigable": True,
+                    "searchable": True,
+                    "schema": {
+                        "type": "issuetype",
+                        "system": "issuetype"
+                    }
+                },
+                {
+                    "id": "project",
+                    "name": "Project",
+                    "custom": False,
+                    "orderable": True,
+                    "navigable": True,
+                    "searchable": True,
+                    "schema": {
+                        "type": "project",
+                        "system": "project"
+                    }
+                },
+                {
+                    "id": "priority",
+                    "name": "Priority",
+                    "custom": False,
+                    "orderable": True,
+                    "navigable": True,
+                    "searchable": True,
+                    "schema": {
+                        "type": "priority",
+                        "system": "priority"
+                    }
+                },
+                {
+                    "id": "labels",
+                    "name": "Labels",
+                    "custom": False,
+                    "orderable": True,
+                    "navigable": True,
+                    "searchable": True,
+                    "schema": {
+                        "type": "array",
+                        "items": "string",
+                        "system": "labels"
+                    }
+                },
+                {
+                    "id": "created",
+                    "name": "Created",
+                    "custom": False,
+                    "orderable": True,
+                    "navigable": True,
+                    "searchable": True,
+                    "schema": {
+                        "type": "datetime",
+                        "system": "created"
+                    }
+                },
+                {
+                    "id": "updated",
+                    "name": "Updated",
+                    "custom": False,
+                    "orderable": True,
+                    "navigable": True,
+                    "searchable": True,
+                    "schema": {
+                        "type": "datetime",
+                        "system": "updated"
+                    }
+                },
+                {
+                    "id": "key",
+                    "name": "Key",
+                    "custom": False,
+                    "orderable": True,
+                    "navigable": True,
+                    "searchable": True,
+                    "schema": {
+                        "type": "string",
+                        "system": "issuekey"
+                    }
+                }
+            ]
+            
+            self._send_json(fields)
+
         def _send_search_results(
             self,
             jql: str,
             start_at: int,
             max_results: int,
         ) -> None:
-            matched = filter_issues_by_jql(issues, jql)
-            paged = matched[start_at : start_at + max_results]
+            # Return bad request for exact "error" JQL query
+            if jql.strip().lower() == "error":
+                self._send_json(
+                    {
+                        "errorMessages": ["Bad request"],
+                        "errors": {},
+                    },
+                    status=HTTPStatus.BAD_REQUEST,
+                )
+                return
+            
+            # Return all issues from datasource (ignore JQL filtering)
+            all_issues = list(issues.values())
+            paged = all_issues[start_at : start_at + max_results]
             self._send_json(
                 {
                     "expand": "schema,names",
                     "startAt": start_at,
                     "maxResults": max_results,
-                    "total": len(matched),
+                    "total": len(all_issues),
                     "issues": paged,
                 }
             )
 
         def _send_json(
             self,
-            body: dict[str, Any],
+            body: Any,
             status: HTTPStatus = HTTPStatus.OK,
         ) -> None:
             payload = json.dumps(body, ensure_ascii=False).encode("utf-8")

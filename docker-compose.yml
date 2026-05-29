@@ -1,0 +1,28 @@
+version: '3.9'
+
+services:
+  jira-analyzer:
+    build: .
+    ports:
+      - '8501:8501'
+    volumes:
+      - ./data:/app/data
+    environment:
+      - LLM_PROVIDER_TYPE=${LLM_PROVIDER_TYPE:-openai-compatible}
+      - LLM_API_KEY=${LLM_API_KEY:-}
+      - LLM_BASE_URL=${LLM_BASE_URL:-https://api.deepseek.com/v1}
+      - LLM_MODEL=${LLM_MODEL:-deepseek-chat}
+      - LLM_FAKE_SCENARIO=${LLM_FAKE_SCENARIO:-default}
+      - LOG_LLM_PROMPTS=${LOG_LLM_PROMPTS:-false}
+      - JIRA_SERVER_URL=${JIRA_SERVER_URL:-http://mock-jira:8081}
+    command: uv run jira-analyzer
+    depends_on:
+      - mock-jira
+
+  mock-jira:
+    build: .
+    ports:
+      - '8081:8081'
+    volumes:
+      - ./data:/app/data
+    command: uv run mock-jira

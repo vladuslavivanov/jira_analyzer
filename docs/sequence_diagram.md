@@ -1,13 +1,15 @@
 # Sequence diagram
 
+This diagram shows the analysis flow for the Streamlit UI, including Jira data retrieval, LLM analysis, and result persistence.
+
 ```mermaid
 sequenceDiagram
     autonumber
 
     actor User
 
-    box Streamlit Web Service
-        participant WebUI as Streamlit Web Service<br>(UI + Controller)
+    box User Interface
+        participant UI as Streamlit UI
     end
 
     box Analysis Service
@@ -16,7 +18,7 @@ sequenceDiagram
         participant TasksRepository as Tasks Repository
     end
 
-    box Task Tracker Integration
+    box Jira Integration
         participant TaskTrackerAdapter as Task Tracker Adapter
         participant JiraClient as Jira Client
     end
@@ -26,7 +28,7 @@ sequenceDiagram
 
     box Storage
         participant AnalysisResultRepo as Analysis Result Repository
-        participant ResultStorage as Analysis Result Storage (SQLite)
+        participant ResultStorage as SQLite Storage
     end
 
     box LLM Provider
@@ -35,128 +37,55 @@ sequenceDiagram
 
     participant LLMProvider as External LLM Provider
 
-    %% User request
+    User->>UI: Request analysis of issues
+    UI->>AnalysisService: Start analysis request
 
-    User->>WebUI: Request analysis of Jira tasks
-
-    WebUI->>AnalysisService: Start analysis request
-
-    %% Task retrieval
-
-    alt Request uses JQL
-        AnalysisService->>TasksRepository: Request tasks for analysis
-
-        TasksRepository->>TaskTrackerAdapter: Query task metadata
-
-        TaskTrackerAdapter->>JiraClient: Forward JQL request
-
-        JiraClient->>MockJira: Call Jira REST API
-
-        MockJira->>FakeTasksStorage: Read mock tasks
-
-        break when dataset corrupted
-            AnalysisService-->>WebUI: Return Jira retrieval error
-        end
-
-        FakeTasksStorage-->>MockJira: Return task data
-
+    alt Use Jira source
+        AnalysisService->>TasksRepository: Load tasks by key or JQL
+        TasksRepository->>TaskTrackerAdapter: Fetch Jira data
+        TaskTrackerAdapter->>JiraClient: Call Jira REST API
+        JiraClient->>MockJira: Query mock Jira service
+        MockJira->>FakeTasksStorage: Read mock issue data
+        FakeTasksStorage-->>MockJira: Return task JSON
         MockJira-->>JiraClient: Return Jira response
-
-        JiraClient-->>TaskTrackerAdapter: Return raw task data
-
-        TaskTrackerAdapter-->>TasksRepository: Return normalized tasks
-
+        JiraClient-->>TaskTrackerAdapter: Return raw tasks
+        TaskTrackerAdapter-->>TasksRepository: Normalize issue data
         TasksRepository-->>AnalysisService: Return tasks
-
-    else Request uses local dataset
-        AnalysisService->>TasksRepository: Request local tasks
-
-        TasksRepository->>FakeTasksStorage: Read local dataset
-
-        break when dataset corrupted
-            AnalysisService-->>WebUI: Return dataset error
-        end
-
-        FakeTasksStorage-->>TasksRepository: Return task data
-
+    else Use local JSON source
+        AnalysisService->>TasksRepository: Load local issues
+        TasksRepository->>FakeTasksStorage: Read sample JSON
+        FakeTasksStorage-->>TasksRepository: Return issues
         TasksRepository-->>AnalysisService: Return tasks
     end
 
-    %% Check already analysed tasks
+    AnalysisService->>AnalysisResultRepo: Query existing results
+    AnalysisResultRepo->>ResultStorage: Read stored state
+    ResultStorage-->>AnalysisResultRepo: Return state
+    AnalysisResultRepo-->>AnalysisService: Return state
 
-    AnalysisService->>AnalysisResultRepo: Check task analysis state
+    AnalysisService->>AnalysisResultRepo: Mark pending tasks
+    AnalysisResultRepo->>ResultStorage: Persist pending state
+    ResultStorage-->>AnalysisResultRepo: Confirm save
+    AnalysisResultRepo-->>AnalysisService: Continue
 
-    AnalysisResultRepo->>ResultStorage: Query existing records
-
-    ResultStorage-->>AnalysisResultRepo: Return task states
-
-    AnalysisResultRepo-->>AnalysisService: Return states
-
-    %% Add pending tasks
-
-    AnalysisService->>AnalysisResultRepo: Mark new tasks as pending
-
-    AnalysisResultRepo->>ResultStorage: Store pending tasks
-
-    ResultStorage-->>AnalysisResultRepo: Confirm storage
-
-    AnalysisResultRepo-->>AnalysisService: Pending tasks ready
-
-    %% Analysis loop
-
-    loop For each pending task (or batch)
-
-        AnalysisService->>Analyzer: Analyze task
-
-        Analyzer->>Analyzer: Split multi-criteria analysis
-
-        par Parallel AI requests
-
-            Analyzer->>LLMClient: Submit analysis request
-
-            Note over LLMClient: Internal async queue,<br/>rate limiting, retries, timeouts
-
-            LLMClient->>LLMProvider: Execute LLM request
-
-            LLMProvider-->>LLMClient: Return partial result
-
-            LLMClient-->>Analyzer: Return analysis response
-
+    loop For each pending task
+        AnalysisService->>Analyzer: Analyze issue
+        Analyzer->>Analyzer: Prepare prompts and split criteria
+        par Parallel LLM requests
+            Analyzer->>LLMClient: Submit LLM request
+            Note over LLMClient: Async queue, retries, timeouts
+            LLMClient->>LLMProvider: Execute request
+            LLMProvider-->>LLMClient: Return response
+            LLMClient-->>Analyzer: Return analysis output
         end
-
         Analyzer->>Analyzer: Merge partial results
-
-        Analyzer-->>AnalysisService: Return completed<br> task analysis
-
-        %% Save result
-
-        AnalysisService->>AnalysisResultRepo: Save analysis result
-
-        AnalysisResultRepo->>ResultStorage: Update task result/state
-
-        ResultStorage-->>AnalysisResultRepo: Confirm update
-
-        AnalysisResultRepo-->>AnalysisService: Save confirmed
-
+        Analyzer-->>AnalysisService: Return analysis result
+        AnalysisService->>AnalysisResultRepo: Save result
+        AnalysisResultRepo->>ResultStorage: Update storage
+        ResultStorage-->>AnalysisResultRepo: Confirm save
+        AnalysisResultRepo-->>AnalysisService: Continue
     end
 
-    %% Final result retrieval
-
-    AnalysisService-->>WebUI: Analysis completed
-
-    WebUI->>AnalysisService: Request final report
-
-    AnalysisService->>AnalysisResultRepo: Query analysis results
-
-    AnalysisResultRepo->>ResultStorage: Retrieve results
-
-    ResultStorage-->>AnalysisResultRepo: Return results
-
-    AnalysisResultRepo-->>AnalysisService: Return results
-
-    AnalysisService->>AnalysisService: Aggregate final report
-
-    AnalysisService-->>WebUI: Return formatted report
-
-    WebUI-->>User: Display analysis report
+    AnalysisService-->>UI: Return final report
+    UI-->>User: Display analysis results
 ```

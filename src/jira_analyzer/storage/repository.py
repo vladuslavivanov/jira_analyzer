@@ -1,16 +1,13 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
-
-from typing import Optional
 
 class AnalysisResultRepository(ABC):
     """Abstract repository for analysis results."""
 
-    @abstractmethod
-    def save_pending(self, task_id: str, task_data: Dict[str, Any]) -> None:
+    def save_pending(self, task_id: str, task_data: Dict[str, Any], run_id: int | None = None) -> None:
         """Save a pending analysis entry for a task."""
         raise NotImplementedError()
 
@@ -42,6 +39,40 @@ class AnalysisResultRepository(ABC):
     @abstractmethod
     def get_all_results(self) -> List[Dict[str, Any]]:
         """Get all analysis results."""
+        raise NotImplementedError()
+
+    # Analysis run management methods
+    def create_analysis_run(
+        self,
+        run_name: str | None = None,
+        system_prompt: str = "",
+        general_prompt: str = "",
+        include_overall_conclusion: bool = True,
+        split_by_criterion: bool = False,
+        reasoning_enabled: bool = False,
+        reasoning_effort: str = "high",
+    ) -> int:
+        """Create a new analysis run and return its ID."""
+        raise NotImplementedError()
+
+    def save_criteria(
+        self,
+        run_id: int,
+        criteria: list[dict]
+    ) -> None:
+        """Save criteria definitions for an analysis run."""
+        raise NotImplementedError()
+
+    def get_analysis_run(self, run_id: int) -> Optional[Dict[str, Any]]:
+        """Get analysis run configuration by ID."""
+        raise NotImplementedError()
+
+    def get_analysis_runs(self) -> List[Dict[str, Any]]:
+        """Get all analysis runs."""
+        raise NotImplementedError()
+
+    def get_criteria(self, run_id: int) -> List[Dict[str, Any]]:
+        """Get criteria definitions for an analysis run."""
         raise NotImplementedError()
 
     # Legacy methods for batch operations

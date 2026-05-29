@@ -1,0 +1,26 @@
+{
+  "scoring_instructions": {
+    "binary": "0 or 1, where 0 means the criterion is not met and 1 means it is met",
+    "five": "0 to 5, where 0 means not met and 5 means fully met",
+    "percent": "0 to 100, where the value is the percent of criterion fulfillment"
+  },
+  "score_schema_labels": {
+    "binary": "0/1",
+    "five": "0-5",
+    "percent": "0-100"
+  },
+  "overall_instructions": {
+    "include": "Also include the overall_conclusion field.",
+    "exclude": "Do not include an overall_conclusion field."
+  },
+  "review_instructions": {
+    "include": "Include a review field with a concise review from this criterion perspective.",
+    "exclude": "Do not include a review field for this criterion."
+  },
+  "schema_descriptions": {
+    "criteria_recommendations": "1-3 specific recommendations for this criterion based on the score",
+    "aggregated_recommendations": "Aggregated list of unique recommendations from all criteria",
+    "overall_conclusion": "Overall conclusion for the issue.",
+    "criterion_review": "Detailed review of this criterion from the analyzed perspective."
+  }
+}

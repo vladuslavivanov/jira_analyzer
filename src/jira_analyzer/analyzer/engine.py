@@ -16,6 +16,7 @@ def run_analysis(
     split_by_criterion: bool = False,
     llm_max_workers: int | None = None,
     repo: Optional[AnalysisResultRepository] = None,
+    run_name: str | None = None,
 ) -> List[Dict[str, Any]]:
     """Analyze a list of Jira issues using the configured analysis service."""
     service = AnalysisService(
@@ -26,6 +27,11 @@ def run_analysis(
         split_by_criterion=split_by_criterion,
         repo=repo,
     )
+    
+    # Create analysis run if repository and name are provided
+    if repo and run_name:
+        service.create_analysis_run(run_name=run_name)
+    
     return service.analyze_issues(issues)
 
 

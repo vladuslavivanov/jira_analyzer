@@ -1,11 +1,63 @@
 import os
 from dotenv import load_dotenv
 
-load_dotenv()
+# Only load .env if it exists and don't override existing env vars set by Docker
+# This allows Docker compose environment variables to take precedence
+load_dotenv(override=False)
 
-DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY")
-DEEPSEEK_BASE_URL = os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com/v1")
-DEEPSEEK_MODEL = os.getenv("DEEPSEEK_MODEL", "deepseek-chat")
+# Provider-agnostic LLM configuration
+LLM_PROVIDER_TYPE = os.getenv("LLM_PROVIDER_TYPE", "fake")
+LLM_API_KEY = os.getenv("LLM_API_KEY")
+LLM_BASE_URL = os.getenv("LLM_BASE_URL", "http://localhost:8000/v1")
+LLM_MODEL = os.getenv("LLM_MODEL", "default-model")
+LLM_FAKE_SCENARIO = os.getenv("LLM_FAKE_SCENARIO", "default")
 
-if not DEEPSEEK_API_KEY:
-    raise ValueError("DEEPSEEK_API_KEY not set in environment")
+# LLM debugging settings
+LOG_LLM_PROMPTS = os.getenv("LOG_LLM_PROMPTS", "false").lower() == "true"
+
+# LLM reasoning mode settings (for models like DeepSeek)
+LLM_REASONING_ENABLED = os.getenv("LLM_REASONING_ENABLED", "false").lower() == "true"
+LLM_REASONING_EFFORT = os.getenv("LLM_REASONING_EFFORT", "high")  # Options: "high", "max"
+
+
+def resolve_llm_config(reasoning_enabled: bool | None = None, reasoning_effort: str | None = None) -> dict:
+    """Resolve LLM configuration from environment variables.
+    
+    Args:
+        reasoning_enabled: Optional override for reasoning mode (from UI)
+        reasoning_effort: Optional override for reasoning effort (from UI)
+    
+    Returns provider configuration dictionary that can be used with ProviderFactory.
+    """
+    from jira_analyzer.analyzer.core.llm.response_schema import get_response_for_scenario
+    
+    provider_type = LLM_PROVIDER_TYPE
+    
+    if provider_type == "openai-compatible":
+        if not LLM_API_KEY:
+            raise ValueError("LLM_API_KEY not set in environment for openai-compatible provider")
+        
+        # Use UI overrides if provided, otherwise use environment variables
+        final_reasoning_enabled = reasoning_enabled if reasoning_enabled is not None else LLM_REASONING_ENABLED
+        final_reasoning_effort = reasoning_effort if reasoning_effort is not None else str(LLM_REASONING_EFFORT)
+        
+        return {
+            "provider_type": provider_type,
+            "api_key": str(LLM_API_KEY),
+            "base_url": str(LLM_BASE_URL),
+            "model": str(LLM_MODEL),
+            "reasoning_enabled": final_reasoning_enabled,
+            "reasoning_effort": final_reasoning_effort
+        }
+    
+    elif provider_type == "fake":
+        # Use proper LLM schema based on scenario type
+        fake_response = get_response_for_scenario(LLM_FAKE_SCENARIO)
+        
+        return {
+            "provider_type": provider_type,
+            "default_response": fake_response
+        }
+    
+    else:
+        raise ValueError(f"Unknown provider type: {provider_type}")
