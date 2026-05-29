@@ -11,7 +11,7 @@ Criteria:
 {criteria_block}
 
 Output requirements:
-- Return only valid JSON. Do not include markdown or explanatory text outside JSON.
+- Return only valid JSON. Do not include markdown or explanatory text outside JSON. Good: { "key": "value" }. Bad: ```json {"key": "value"} ```
 - Follow the JSON schema below exactly and keep the exact criterion ids.
 - Put every criterion result into the top-level "criteria" object.
 - Each criterion result must include title, description, scoring_system, and score.
