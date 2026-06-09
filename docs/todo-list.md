@@ -20,11 +20,11 @@
 - [x] ensure independence from Deepseek LLM provider. Should be able easily add new LLM Provider
 - [x] LLM reasoning setting
 - [x] extract localization configuratino to resource file
-- [ ] Title/Summary mismatch which leads to "No title" in results page in list.
+- [x] Title/Summary mismatch which leads to "No title" in results page in list.
 - [ ] Show processing status for tasks in list on results page.
-- [ ] Asignee is not provided on results page even if asignee for task is set.
+- [x] Asignee is not provided on results page even if asignee for task is set.
 - [ ] Add ability to export analysis config from results page which was used for task
-- [ ] Wrong N/A value of Creation Date for real task in results page.
+- [x] Wrong N/A value of Creation Date for real task in results page.
 
 - [ ] experiments:
   - analyse AI model value:
