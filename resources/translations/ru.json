@@ -165,5 +165,7 @@
   "error_section": "Ошибка",
   "na_value": "Н/Д",
 
-  "analysis_in_progress": "Анализ выполняется. Пожалуйста, дождитесь завершения."
+  "analysis_in_progress": "Анализ выполняется. Пожалуйста, дождитесь завершения.",
+
+  "jql_hint": "**Базовый синтаксис JQL:**\n- `key IN (PROJ-1, PROJ-2)` — выбор задач по ключам\n- `parent = PROJ-1` — подзадачи PROJ-1\n- `project = PROJ ORDER BY created DESC` — самые новые задачи в проекте (ограничивается настройкой Max results)\n- `issuetype = Story AND status != Closed` — все открытые задачи типа Story"
 }

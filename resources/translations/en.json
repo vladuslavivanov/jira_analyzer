@@ -165,5 +165,7 @@
   "error_section": "Error",
   "na_value": "N/A",
 
-  "analysis_in_progress": "Analysis is in progress. Please wait until it completes."
+  "analysis_in_progress": "Analysis is in progress. Please wait until it completes.",
+
+  "jql_hint": "**Basic JQL syntax:**\n- `key IN (PROJ-1, PROJ-2)` — select tasks by keys\n- `parent = PROJ-1` — select subtasks of PROJ-1\n- `project = PROJ ORDER BY created DESC` — newest tasks in project (limited by Max results setting)\n- `issuetype = Story AND status != Closed` — all open Story-type tasks"
 }
