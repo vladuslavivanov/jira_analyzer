@@ -21,11 +21,11 @@
 - [x] LLM reasoning setting
 - [x] extract localization configuratino to resource file
 - [x] Title/Summary mismatch which leads to "No title" in results page in list.
-- [ ] Show processing status for tasks in list on results page.
+- [x] Show processing status for tasks in list on results page.
 - [x] Asignee is not provided on results page even if asignee for task is set.
-- [ ] Add ability to export analysis config from results page which was used for task
+- [x] Add ability to export analysis config from results page which was used for task
 - [x] Wrong N/A value of Creation Date for real task in results page.
-- [ ] Run analysis twice when hit the button after analysis starts
+- [x] Run analysis twice when hit the button after analysis starts
 
 - [ ] experiments:
   - analyse AI model value:
