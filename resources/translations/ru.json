@@ -113,6 +113,8 @@
   "analysis_run_label": "Запуск анализа",
   "all_runs": "Все запуски",
   "filter_all": "Все",
+  "filter_pending": "В ожидании",
+  "filter_processing": "Обрабатывается",
   "filter_completed": "Завершённые",
   "filter_failed": "Ошибки",
   "no_title": "Нет заголовка",

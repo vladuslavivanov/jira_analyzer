@@ -113,6 +113,8 @@
   "analysis_run_label": "Analysis Run",
   "all_runs": "All Runs",
   "filter_all": "All",
+  "filter_pending": "Pending",
+  "filter_processing": "Processing",
   "filter_completed": "Completed",
   "filter_failed": "Failed",
   "no_title": "No title",
