@@ -144,8 +144,14 @@ class ResultsViewer:
         with filter_container:
             status_filter = st.selectbox(
                 self.t("filter_by_status"),
-                options=["All", "Completed", "Failed"],
-                format_func=lambda x: {"All": self.t("filter_all"), "Completed": self.t("filter_completed"), "Failed": self.t("filter_failed")}.get(x, x),
+                options=["All", "Pending", "Processing", "Completed", "Failed"],
+                format_func=lambda x: {
+                    "All": self.t("filter_all"),
+                    "Pending": self.t("filter_pending"),
+                    "Processing": self.t("filter_processing"),
+                    "Completed": self.t("filter_completed"),
+                    "Failed": self.t("filter_failed"),
+                }.get(x, x),
                 key="status_filter",
             )
 
@@ -167,9 +173,20 @@ class ResultsViewer:
             is_selected = task_id == st.session_state.selected_result_id
             card_color = "primary" if is_selected else "secondary"
             
+            # Determine state indicator (all states except completed get an emoji)
+            state = result.get("state", "PENDING")
+            if state == "PENDING":
+                state_prefix = "⏳ "
+            elif state == "PROCESSING":
+                state_prefix = "🔄 "
+            elif state == "FAILED":
+                state_prefix = "❌ "
+            else:
+                state_prefix = ""      # completed or unknown — no emoji
+
             # Use button to select the result (simple direct interaction)
             if st.button(
-                f"{self.t('issue_title', id=task_id, title=title)}",
+                f"{state_prefix}{self.t('issue_title', id=task_id, title=title)}",
                 key=f"select_{task_id}",
                 type=card_color,
             ):
@@ -202,7 +219,11 @@ class ResultsViewer:
 
         # Status filter - map UI-friendly values to database state values
         # Defensive filtering: handle None states and use exact matching
-        if status_filter == "Completed":
+        if status_filter == "Pending":
+            filtered = [r for r in filtered if r.get("state") == "PENDING"]
+        elif status_filter == "Processing":
+            filtered = [r for r in filtered if r.get("state") == "PROCESSING"]
+        elif status_filter == "Completed":
             filtered = [r for r in filtered if r.get("state") == "COMPLETED"]
         elif status_filter == "Failed":
             filtered = [r for r in filtered if r.get("state") == "FAILED"]
