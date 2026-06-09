@@ -618,7 +618,7 @@ def _is_closed_status_streamlit(issue: dict) -> bool:
     return status in closed_statuses
 
 def _render_results(results: list[dict], t) -> None:
-    markdown_report = build_markdown_report(results)
+    markdown_report = build_markdown_report(results, t=t)
 
     report_tab, json_tab = st.tabs(
         [t("markdown_report"), "JSON", ]
