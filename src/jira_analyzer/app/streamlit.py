@@ -680,6 +680,7 @@ def _render_analysis_page(
                 "JQL",
                 value="project = YA",
                 height=100,
+                help=t("jql_hint"),
             )
 
         exclude_closed = st.checkbox(
