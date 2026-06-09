@@ -25,6 +25,7 @@
 - [x] Asignee is not provided on results page even if asignee for task is set.
 - [ ] Add ability to export analysis config from results page which was used for task
 - [x] Wrong N/A value of Creation Date for real task in results page.
+- [ ] Run analysis twice when hit the button after analysis starts
 
 - [ ] experiments:
   - analyse AI model value:
