@@ -716,22 +716,14 @@ def _render_analysis_page(
         value=False,
         help=t("split_by_criterion_help"),
     )
-    
-    # LLM reasoning mode settings
-    reasoning_enabled = st.checkbox(
-        "Enable LLM Reasoning Mode",
-        value=False,
-        help="Enable DeepSeek reasoning mode for improved analysis quality (may increase response time)"
+
+    # LLM reasoning effort — single knob for model thinking/reasoning
+    reasoning_effort = st.selectbox(
+        "Reasoning Effort",
+        options=["none", "low", "medium", "high"],
+        index=0,
+        help="None: nothink mode (no thinking tokens). Low/Medium/High: enable reasoning at specified effort."
     )
-    
-    reasoning_effort = None
-    if reasoning_enabled:
-        reasoning_effort = st.selectbox(
-            "Reasoning Effort Level",
-            options=["high", "max"],
-            index=0,
-            help="Level of reasoning effort: 'high' for balanced performance, 'max' for best results (slower)"
-        )
 
     st.divider()
 
@@ -782,7 +774,6 @@ def _render_analysis_page(
                         worker_count=int(worker_count),
                         split_by_criterion=split_by_criterion,
                         repo=repo,
-                        reasoning_enabled=reasoning_enabled,
                         reasoning_effort=reasoning_effort,
                     )
                     run_id = service.create_analysis_run(run_name=run_name)

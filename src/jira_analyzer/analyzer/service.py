@@ -43,8 +43,7 @@ class AnalysisService:
         task_repository: TasksRepository | None = None,
         repo: AnalysisResultRepository | None = None,
         run_id: int | None = None,
-        reasoning_enabled: bool = False,
-        reasoning_effort: str = "high",
+        reasoning_effort: str = "none",
     ):
         self.prompt_template = prompt_template
         self.prompt_config = prompt_config
@@ -53,13 +52,12 @@ class AnalysisService:
         self.task_repository = task_repository
         self.repo = repo
         self.run_id = run_id
-        self.reasoning_enabled = reasoning_enabled
         self.reasoning_effort = reasoning_effort
 
         if self.prompt_config is None and self.prompt_template is None:
             self.prompt_config = get_default_prompt_config()
 
-        provider = llm_provider or self._resolve_default_provider(reasoning_enabled, reasoning_effort)
+        provider = llm_provider or self._resolve_default_provider(reasoning_effort)
         self.llm_client = LLMClient(
             provider=provider,
             max_workers=llm_max_workers or self.worker_count,
@@ -88,6 +86,9 @@ class AnalysisService:
             for criterion in self.prompt_config.criteria
         ]
         
+        # Derive reasoning_enabled from reasoning_effort for DB storage
+        db_reasoning_enabled = self.reasoning_effort != "none"
+        
         # Create the analysis run
         run_id = self.repo.create_analysis_run(
             run_name=run_name,
@@ -95,7 +96,7 @@ class AnalysisService:
             general_prompt=self.prompt_config.general_prompt,
             include_overall_conclusion=self.prompt_config.include_overall_conclusion,
             split_by_criterion=self.split_by_criterion,
-            reasoning_enabled=self.reasoning_enabled,
+            reasoning_enabled=db_reasoning_enabled,
             reasoning_effort=self.reasoning_effort,
         )
         
@@ -170,22 +171,21 @@ class AnalysisService:
             return build_markdown_report(results)
         return json.dumps(results, ensure_ascii=False, indent=2)
 
-    def _resolve_default_provider(self, reasoning_enabled: bool | None = None, reasoning_effort: str | None = None) -> LLMProvider:
+    def _resolve_default_provider(self, reasoning_effort: str | None = None) -> LLMProvider:
         """Resolve default LLM provider using the new provider agnostic architecture.
         
         Uses ProviderFactory to create sync provider and wraps it in adapter
         for compatibility with the async AnalysisService infrastructure.
         
         Args:
-            reasoning_enabled: Optional override for reasoning mode
-            reasoning_effort: Optional override for reasoning effort level
+            reasoning_effort: Optional override for reasoning effort ("none", "low", "medium", "high")
         
         Returns:
             LLMProvider instance compatible with async LLMClient
         """
         try:
             # Get provider configuration from environment with optional UI overrides
-            provider_config = resolve_llm_config(reasoning_enabled, reasoning_effort)
+            provider_config = resolve_llm_config(reasoning_effort)
             
             # Create synchronous provider using factory
             sync_provider = ProviderFactory.create_provider(provider_config)
