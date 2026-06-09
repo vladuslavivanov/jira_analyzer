@@ -107,6 +107,8 @@
   "result_not_found": "Result not found: {id}",
   "no_analysis_results": "No analysis results found in the database. Run an analysis first.",
 
+  "export_config": "Export config",
+
   "skipping_malformed": "Skipping malformed result: {error}",
   "analysis_run_label": "Analysis Run",
   "all_runs": "All Runs",

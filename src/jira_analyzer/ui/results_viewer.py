@@ -1,5 +1,6 @@
 """Results Viewer for browsing SQLite analysis results."""
 
+import json
 from typing import Any, Dict, List, Callable
 
 import pandas as pd
@@ -337,7 +338,36 @@ class ResultsViewer:
                                 if criterion.get('include_review'):
                                     st.write(f"*{self.t('includes_review_label')}*")
                                 st.divider()
-                            
+
+                    # Export button
+                    export_data = {
+                        "version": 1,
+                        "run_name": analysis_run.get("run_name", f"Run {run_id}"),
+                        "created_at": analysis_run.get("created_at", ""),
+                        "system_prompt": analysis_run.get("system_prompt", ""),
+                        "general_prompt": analysis_run.get("general_prompt", ""),
+                        "include_overall_conclusion": analysis_run.get("include_overall_conclusion", True),
+                        "split_by_criterion": analysis_run.get("split_by_criterion", False),
+                        "reasoning_enabled": analysis_run.get("reasoning_enabled", False),
+                        "reasoning_effort": analysis_run.get("reasoning_effort", "high"),
+                        "criteria": [
+                            {
+                                "title": c.get("title", ""),
+                                "description": c.get("description", ""),
+                                "scoring_system": c.get("scoring_system", "percent"),
+                                "include_review": bool(c.get("include_review", False)),
+                            }
+                            for c in (criteria or [])
+                        ],
+                    }
+                    export_json = json.dumps(export_data, ensure_ascii=False, indent=2)
+                    st.download_button(
+                        label=self.t("export_config"),
+                        data=export_json,
+                        file_name=f"analysis_config_run_{run_id}.json",
+                        mime="application/json",
+                        use_container_width=True,
+                    )
         except Exception as e:
             st.warning(self.t("loaded_config_error", error=e))
 
