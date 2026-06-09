@@ -159,5 +159,7 @@
   "criteria_details_section": "Criteria Details",
   "table_header_criterion": "Criterion",
   "error_section": "Error",
-  "na_value": "N/A"
+  "na_value": "N/A",
+
+  "analysis_in_progress": "Analysis is in progress. Please wait until it completes."
 }

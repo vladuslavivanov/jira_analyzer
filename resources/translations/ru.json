@@ -159,5 +159,7 @@
   "criteria_details_section": "Детали критериев",
   "table_header_criterion": "Критерий",
   "error_section": "Ошибка",
-  "na_value": "Н/Д"
+  "na_value": "Н/Д",
+
+  "analysis_in_progress": "Анализ выполняется. Пожалуйста, дождитесь завершения."
 }

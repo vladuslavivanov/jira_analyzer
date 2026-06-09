@@ -734,9 +734,16 @@ def _render_analysis_page(
 
     st.divider()
 
-    # Section 4: Run analysis button
-    if st.button(t("run_analysis"), type="primary"):
-        st.session_state.analysis_results = None
+    # Section 4: Run analysis
+    # Show the button when NOT running; it's replaced by the spinner during analysis
+    if not st.session_state.get("analysis_running"):
+        if st.button(t("run_analysis"), type="primary"):
+            st.session_state.analysis_results = None
+            st.session_state.analysis_running = True
+            st.rerun()
+
+    # When analysis_running is True, the button is hidden and a spinner is shown
+    if st.session_state.get("analysis_running"):
         try:
             issues = _load_issues(
                 t=t,
@@ -755,46 +762,45 @@ def _render_analysis_page(
             )
             if not issues:
                 st.warning(t("no_issues"))
-                return
+            else:
+                with st.spinner(
+                    t("analyzing", count=len(issues), workers=int(worker_count))
+                ):
+                    repo = SqliteAnalysisResultRepository(db_path)
 
-            with st.spinner(
-                t("analyzing", count=len(issues), workers=int(worker_count))
-            ):
-                repo = SqliteAnalysisResultRepository(db_path)
-                
-                # Create a meaningful run name based on analysis type
-                if source == "Jira":
-                    if jira_query_mode == "Issue key":
-                        run_name = f"Issue Analysis: {jira_issue}"
+                    if source == "Jira":
+                        if jira_query_mode == "Issue key":
+                            run_name = f"Issue Analysis: {jira_issue}"
+                        else:
+                            run_name = f"JQL Analysis: {jira_jql[:50]}..."
                     else:
-                        run_name = f"JQL Analysis: {jira_jql[:50]}..."
-                else:
-                    run_name = "JSON Dataset Analysis"
-                
-                # Create analysis service first to get run_id
-                service = AnalysisService(
-                    prompt_config=prompt_config,
-                    worker_count=int(worker_count),
-                    split_by_criterion=split_by_criterion,
-                    repo=repo,
-                    reasoning_enabled=reasoning_enabled,
-                    reasoning_effort=reasoning_effort,
-                )
-                
-                # Create analysis run and get run_id
-                run_id = service.create_analysis_run(run_name=run_name)
-                st.session_state.current_run_id = run_id
-                
-                # Perform analysis using the service with run_id
-                results = service.analyze_issues(issues)
+                        run_name = "JSON Dataset Analysis"
 
-            st.session_state.analysis_results = results
-            st.success(t("analysis_complete"))
+                    service = AnalysisService(
+                        prompt_config=prompt_config,
+                        worker_count=int(worker_count),
+                        split_by_criterion=split_by_criterion,
+                        repo=repo,
+                        reasoning_enabled=reasoning_enabled,
+                        reasoning_effort=reasoning_effort,
+                    )
+                    run_id = service.create_analysis_run(run_name=run_name)
+                    st.session_state.current_run_id = run_id
+                    results = service.analyze_issues(issues)
+
+                st.session_state.analysis_results = results
+                st.success(t("analysis_complete"))
         except Exception as error:
             st.error(t("analysis_error", error=error))
             logger.exception("UI analysis error")
+        finally:
+            st.session_state.analysis_running = False
 
-    if st.session_state.analysis_results:
+        # Rerun on success to show button + results on a clean render cycle
+        if st.session_state.get("analysis_results"):
+            st.rerun()
+
+    if st.session_state.get("analysis_results"):
         _render_results(st.session_state.analysis_results, t)
 
 def main() -> None:
