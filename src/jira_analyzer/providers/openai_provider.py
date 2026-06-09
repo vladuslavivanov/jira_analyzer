@@ -77,16 +77,12 @@ class OpenAICompatibleProvider(BaseLLMProvider):
         }
 
         # Map reasoning_effort to API-specific parameters:
-        #   "none" → DeepSeek-style `thinking: disabled` (nothink mode)
-        #   "low"/"medium"/"high" → OpenAI o-series `reasoning_effort` + DeepSeek `thinking: enabled`
+        #   "none"  → extra_body: {think: false} (Ollama's nothink, harmlessly ignored by others)
+        #   other   → reasoning_effort (OpenAI o-series native, harmlessly ignored by others)
         if self._reasoning_effort == "none":
-            # Nothink: explicitly tell DeepSeek-style APIs not to think.
-            # For strict OpenAI API (api.openai.com) set LLM_REASONING_EFFORT=none
-            # and the parameter is harmlessly ignored by most OpenAI-compatible servers.
-            api_params["extra_body"] = {"thinking": {"type": "disabled"}}
+            api_params["extra_body"] = {"think": False}
         else:
             api_params["reasoning_effort"] = self._reasoning_effort
-            api_params["extra_body"] = {"thinking": {"type": "enabled"}}
 
         # Call API with explicit type ignore as we're formatting correctly
         response = self._client.chat.completions.create(**api_params)

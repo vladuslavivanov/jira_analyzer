@@ -16,14 +16,16 @@ LLM_FAKE_SCENARIO = os.getenv("LLM_FAKE_SCENARIO", "default")
 LOG_LLM_PROMPTS = os.getenv("LOG_LLM_PROMPTS", "false").lower() == "true"
 
 # LLM reasoning effort — single user-facing knob for model thinking/reasoning.
+# Compatible with ALL OpenAI-compatible APIs, including Ollama, vLLM, api.openai.com, etc.
 # Values:
-#   "none" (default) — nothink mode. No reasoning/thinking parameters sent to API.
-#   "low"             — low reasoning effort (OpenAI o-series: reasonin_effort="low").
-#   "medium"          — medium reasoning effort (OpenAI o-series: reasonin_effort="medium").
-#   "high"            — high reasoning effort (OpenAI o-series: reasonin_effort="high").
-# Internal mapping:
-#   "none"      → sends `thinking: {type: "disabled"}` in extra_body (DeepSeek nothink)
-#   "low/high"  → sends `reasoning_effort` (OpenAI o-series) + `thinking: {type: "enabled"}` (DeepSeek)
+#   "none" (default) — nothink mode. Sends `think: false` in extra_body (Ollama's native
+#     nothink parameter). Harmlessly ignored by all other OpenAI-compatible APIs.
+#   "low"            — send reasoning_effort="low" (OpenAI o-series native parameter).
+#   "medium"         — send reasoning_effort="medium".
+#   "high"           — send reasoning_effort="high".
+# When set to "low"/"medium"/"high", the standard `reasoning_effort` parameter is sent.
+# Models that don't support it (GPT-4o, Qwen, Llama, etc.) silently ignore it.
+# Only OpenAI o-series and similar reasoning models act on it.
 LLM_REASONING_EFFORT = os.getenv("LLM_REASONING_EFFORT", "none").lower()
 
 
