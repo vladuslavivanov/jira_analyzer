@@ -225,10 +225,10 @@ class SqliteAnalysisResultRepository(AnalysisResultRepository):
             return data
 
     def get_all_results(self) -> List[Dict[str, Any]]:
-        """Get all completed analysis results."""
+        """Get all analysis results (all states: PENDING, PROCESSING, COMPLETED, FAILED)."""
         with sqlite3.connect(self.database_path) as conn:
             cursor = conn.execute(
-                "SELECT * FROM analysis_results WHERE state = 'COMPLETED' ORDER BY analyzed_at DESC"
+                "SELECT * FROM analysis_results ORDER BY COALESCE(analyzed_at, created_at) DESC"
             )
             rows = cursor.fetchall()
             results = []
@@ -321,14 +321,14 @@ class SqliteAnalysisResultRepository(AnalysisResultRepository):
     def get_results(self, run_id: int) -> List[Dict[str, Any]]:
         """Retrieve analysis results (legacy, ignores run_id)."""
         full = self.get_all_results()
-        return [r["analysis"] for r in full]
+        return [r["analysis"] for r in full if r.get("analysis")]
 
     def get_latest_results(self) -> List[Dict[str, Any]]:
         """Retrieve the most recent analysis results (legacy)."""
         all_results = self.get_all_results()
         if all_results:
             all_results.sort(key=lambda x: x.get("analyzed_at", ""), reverse=True)
-            return [r["analysis"] for r in all_results[:50]]
+            return [r["analysis"] for r in all_results[:50] if r.get("analysis")]
         return []
 
     # Analysis run management methods

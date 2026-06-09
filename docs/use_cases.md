@@ -46,8 +46,8 @@
 
 ### 5. Persist analysis state
 
-- Save pending tasks to SQLite before analysis begins.
-- Update task state to processing while analysis runs.
+- All tasks are saved to SQLite with PENDING state before analysis begins — they appear in the results page immediately.
+- Update task state to PROCESSING while analysis runs.
 - Save completed analysis results.
 - Save failed results and error details.
 - Store analysis run metadata and criteria definitions.
@@ -57,6 +57,8 @@
 - Display analysis results in the Streamlit UI.
 - Show issue details, criteria breakdown, verdict, and recommendations.
 - Filter and search analysis results in the UI.
+- Each task in the result list shows a state indicator (⏳ PENDING, 🔄 PROCESSING, ✅ COMPLETED, ❌ FAILED).
+- Status filter allows viewing tasks by any processing state.
 - Switch between analysis and results pages.
 
 ### 7. Export output

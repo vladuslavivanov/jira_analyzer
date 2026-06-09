@@ -2,12 +2,33 @@ import json
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Callable, Dict, List
 
 from jira_analyzer.storage.sqlite_repository import SqliteAnalysisResultRepository
 from jira_analyzer.utils.logger import setup_logger
 
 logger = setup_logger(__name__)
+
+# Default English translations for contexts without a language selector
+_DEFAULT_TRANSLATIONS = None
+
+
+def _get_default_translate() -> Callable[[str], str]:
+    """Create a default translate function using English resource file."""
+    global _DEFAULT_TRANSLATIONS
+    if _DEFAULT_TRANSLATIONS is None:
+        path = Path(__file__).resolve().parent.parent.parent.parent / "resources" / "translations" / "en.json"
+        try:
+            with open(path, encoding="utf-8") as f:
+                _DEFAULT_TRANSLATIONS = json.load(f)
+        except Exception:
+            _DEFAULT_TRANSLATIONS = {}
+
+    def _translate(key: str, **kwargs: Any) -> str:
+        text = _DEFAULT_TRANSLATIONS.get(key, key)
+        return text.format(**kwargs) if kwargs else text
+
+    return _translate
 
 
 @dataclass
@@ -45,47 +66,46 @@ def save_results(results: List[Dict[str, Any]], output_path: str) -> None:
         raise
 
 
-def build_markdown_report(results: List[Dict[str, Any]]) -> str:
+def build_markdown_report(
+    results: List[Dict[str, Any]],
+    t: Callable | None = None,
+) -> str:
     """
     Generate a comprehensive Markdown report from analysis results.
-    
-    This orchestrator function coordinates the report generation process by:
-    1. Collecting criteria information from all results
-    2. Calculating statistics across all issues
-    3. Building individual report sections
-    4. Combining sections into final markdown output
-    
+
     Args:
-        results: List of analysis result dictionaries containing criteria,
-               scores, and metadata for each issue.
-    
+        results: List of analysis result dictionaries.
+        t: Optional translation function. Falls back to English if not provided.
+
     Returns:
-        Complete Markdown report as a string with summary, statistics,
-        zombie tasks, and detailed issue information.
+        Complete Markdown report as a string.
     """
+    if t is None:
+        t = _get_default_translate()
+
     if not results:
-        return "# Jira Task Analysis Report\n\nNo issues analyzed.\n"
+        return f"# {t('report_title')}\n\n{t('no_issues_analyzed')}\n"
 
     criteria_info = _collect_criteria_info(results)
     statistics = _calculate_statistics(results, criteria_info)
-    
-    summary_table = _build_summary_table(results, criteria_info, statistics)
-    criteria_stats = _build_criteria_statistics_section(criteria_info, statistics)
-    zombie_section = _build_zombie_tasks_section(results)
-    issues_section = _build_issue_details_section(results, criteria_info)
+
+    summary_table = _build_summary_table(results, criteria_info, statistics, t)
+    criteria_stats = _build_criteria_statistics_section(criteria_info, statistics, t)
+    zombie_section = _build_zombie_tasks_section(results, t)
+    issues_section = _build_issue_details_section(results, criteria_info, t)
 
     lines = [
-        "# Jira Task Analysis Report",
+        f"# {t('report_title')}",
         "",
-        f"Analyzed issues: {len(results)}",
+        t("analyzed_issues_count", count=len(results)),
         "",
-        "## Summary",
+        f"## {t('summary_section')}",
         "",
         summary_table,
         "",
         criteria_stats,
         zombie_section,
-        "## Issue Details",
+        f"## {t('issue_details_section')}",
         "",
         issues_section,
     ]
@@ -94,19 +114,7 @@ def build_markdown_report(results: List[Dict[str, Any]]) -> str:
 
 
 def _collect_criteria_info(results: List[Dict[str, Any]]) -> CriteriaInfo:
-    """
-    Collect and structure criteria information from all analysis results.
-    
-    Iterates through all results to extract criteria metadata including keys,
-    titles, descriptions, and scoring systems. Handles both the 'criteria' 
-    and 'criteria_scores' result structures.
-    
-    Args:
-        results: List of analysis result dictionaries containing criteria data.
-    
-    Returns:
-        CriteriaInfo object with collected keys and metadata.
-    """
+    """Collect and structure criteria information from all analysis results."""
     criteria_keys: List[str] = []
     criteria_metadata: Dict[str, Dict[str, str]] = {}
 
@@ -150,19 +158,7 @@ def _collect_criteria_info(results: List[Dict[str, Any]]) -> CriteriaInfo:
 def _calculate_statistics(
     results: List[Dict[str, Any]], criteria_info: CriteriaInfo
 ) -> Statistics:
-    """
-    Calculate score statistics across all analyzed issues.
-    
-    Computes totals and counts for each criterion to enable average
-    calculations in the report.
-    
-    Args:
-        results: List of analysis result dictionaries containing score data.
-        criteria_info: CriteriaInfo object with criteria keys.
-    
-    Returns:
-        Statistics object with computed totals and counts.
-    """
+    """Calculate score statistics across all analyzed issues."""
     total_scores: List[float] = [0.0] * len(criteria_info.keys)
     score_counts: List[int] = [0] * len(criteria_info.keys)
 
@@ -182,29 +178,21 @@ def _calculate_statistics(
 def _build_summary_table(
     results: List[Dict[str, Any]],
     criteria_info: CriteriaInfo,
-    statistics: Statistics
+    statistics: Statistics,
+    t: Callable,
 ) -> str:
-    """
-    Build the summary table with all issues and their scores.
-    
-    Creates a comprehensive markdown table showing issue keys, types,
-    individual criterion scores, and verdicts.
-    
-    Args:
-        results: List of analysis result dictionaries.
-        criteria_info: CriteriaInfo object with titles and metadata.
-        statistics: Statistics object with computed averages.
-    
-    Returns:
-        Markdown formatted summary table as a string.
-    """
-    summary_headers = ["#", "Issue", "Type"]
+    """Build the summary table with all issues and their scores."""
+    summary_headers = [
+        t("table_header_num"),
+        t("table_header_issue"),
+        t("table_header_type"),
+    ]
     summary_headers.extend(criteria_info.titles)
-    
+
     has_verdict = any("verdict" in result for result in results)
-    
+
     if has_verdict:
-        summary_headers.append("Verdict")
+        summary_headers.append(t("verdict"))
 
     lines = [
         _markdown_table_row(summary_headers),
@@ -225,7 +213,7 @@ def _build_summary_table(
 
         lines.append(_markdown_table_row(row))
 
-    lines.append(_build_average_row(criteria_info, statistics, has_verdict))
+    lines.append(_build_average_row(criteria_info, statistics, has_verdict, t))
 
     return "\n".join(lines)
 
@@ -233,20 +221,11 @@ def _build_summary_table(
 def _build_average_row(
     criteria_info: CriteriaInfo,
     statistics: Statistics,
-    has_verdict: bool
+    has_verdict: bool,
+    t: Callable,
 ) -> str:
-    """
-    Build the averages row for the summary table.
-    
-    Args:
-        criteria_info: CriteriaInfo object with criteria keys.
-        statistics: Statistics object with computed totals.
-        has_verdict: Whether verdicts exist in results.
-    
-    Returns:
-        Markdown formatted averages row showing computed averages.
-    """
-    average_row = ["", "**Average**", ""]
+    """Build the averages row for the summary table."""
+    average_row = ["", f"**{t('average_label')}**", ""]
 
     for score_index, count in enumerate(statistics.score_counts):
         if count:
@@ -265,77 +244,63 @@ def _build_average_row(
 
 def _build_criteria_statistics_section(
     criteria_info: CriteriaInfo,
-    statistics: Statistics
+    statistics: Statistics,
+    t: Callable,
 ) -> str:
-    """
-    Build the evaluation criteria statistics table.
-    
-    Creates a detailed table showing each criterion's name, scoring system,
-    average score across all issues, and description.
-    
-    Args:
-        criteria_info: CriteriaInfo object with criteria metadata.
-        statistics: Statistics object with computed averages.
-    
-    Returns:
-        Markdown formatted criteria statistics section as a string.
-    """
+    """Build the evaluation criteria statistics table."""
     if not criteria_info.keys:
         return ""
 
     lines = [
-        "## Evaluation Criteria",
+        f"## {t('evaluation_criteria_section')}",
         "",
-        _markdown_table_row(["Name", "Scoring", "Average", "Description"]),
+        _markdown_table_row([
+            t("table_header_name"),
+            t("table_header_scoring"),
+            t("table_header_average"),
+            t("table_header_description"),
+        ]),
         _markdown_table_row(["---", "---", "---", "---"]),
     ]
 
     for key in criteria_info.keys:
         index = criteria_info.keys.index(key)
         count = statistics.score_counts[index]
-        
+
         if count > 0:
             avg = statistics.total_scores[index] / count
             avg_str = f"{avg:.2f}"
         else:
             avg_str = ""
-        
+
         info = criteria_info.metadata.get(key, {})
         name = info.get("title", key.replace("_", " ").title())
         scoring = info.get("scoring_system", "")
         description = info.get("description", "")
-        
+
         lines.append(_markdown_table_row([name, scoring, avg_str, description]))
 
     return "\n".join(lines) + "\n"
 
 
-def _build_zombie_tasks_section(results: List[Dict[str, Any]]) -> str:
-    """
-    Build the zombie tasks section for issues not updated recently.
-    
-    Identifies and formats a list of tasks that haven't been updated
-    in the last 30 days, making them potentially abandoned.
-    
-    Args:
-        results: List of analysis result dictionaries.
-    
-    Returns:
-        Markdown formatted zombie tasks section, empty string if none found.
-    """
+def _build_zombie_tasks_section(
+    results: List[Dict[str, Any]],
+    t: Callable,
+) -> str:
+    """Build the zombie tasks section for issues not updated recently."""
     zombie_tasks = [result for result in results if _is_zombie_task(result)]
-    
+
     if not zombie_tasks:
         return ""
 
     lines = [
-        "## Zombie Tasks",
+        f"## {t('zombie_tasks_section')}",
         "",
-        f"Found {len(zombie_tasks)} tasks not updated for 30+ days:",
+        t("zombie_tasks_found", count=len(zombie_tasks)),
     ]
-    
+
     for result in zombie_tasks:
-        issue_key = result.get("jira_key") or result.get("key") or "Unknown"
+        issue_key = result.get("jira_key") or result.get("key") or t("na_value")
         lines.append(f"- {issue_key}")
 
     return "\n".join(lines) + "\n"
@@ -343,122 +308,102 @@ def _build_zombie_tasks_section(results: List[Dict[str, Any]]) -> str:
 
 def _build_issue_details_section(
     results: List[Dict[str, Any]],
-    criteria_info: CriteriaInfo
+    criteria_info: CriteriaInfo,
+    t: Callable,
 ) -> str:
-    """
-    Build detailed information for each analyzed issue.
-    
-    Creates comprehensive individual issue sections showing metadata,
-    status, zombie status, scores, verdict, criteria details, errors,
-    conclusions, and original descriptions.
-    
-    Args:
-        results: List of analysis result dictionaries.
-        criteria_info: CriteriaInfo object with criteria metadata.
-    
-    Returns:
-        Markdown formatted issue details section as a string.
-    """
+    """Build detailed information for each analyzed issue."""
     lines = []
 
     for index, result in enumerate(results, start=1):
         issue_key = result.get("jira_key") or result.get("key") or f"Issue {index}"
-        issue_type = result.get("input_element_type", "N/A")
-        
+        issue_type = result.get("input_element_type", t("na_value"))
+
         lines.extend([
             f"### {index}. {issue_key}",
             "",
-            f"- Type: {issue_type}",
+            f"- {t('table_header_type')}: {issue_type}",
         ])
 
         status = result.get("status", "")
         if status:
-            lines.append(f"- Status: {status}")
+            lines.append(f"- {t('status')}: {status}")
 
         updated_at = result.get("updated_at", "")
         if updated_at:
-            lines.append(f"- Updated: {updated_at}")
+            lines.append(f"- {t('updated_label')}: {updated_at}")
             if _is_zombie_task(result):
-                lines.append("- **Zombie Task**: Not updated for 30+ days")
+                lines.append(f"- **{t('zombie_task_label')}**: {t('zombie_task_not_updated')}")
 
         if "verdict" in result:
-            lines.append(f"- Verdict: {result['verdict']}")
+            lines.append(f"- {t('verdict')}: {result['verdict']}")
 
         lines.append("")
-        lines.extend(_build_issue_criteria_details(result, criteria_info))
-        lines.extend(_build_issue_conclusion_section(result))
-        lines.extend(_build_issue_description_section(result))
+        lines.extend(_build_issue_criteria_details(result, criteria_info, t))
+        lines.extend(_build_issue_conclusion_section(result, t))
+        lines.extend(_build_issue_description_section(result, t))
 
     return "\n".join(lines)
 
 
 def _build_issue_criteria_details(
     result: Dict[str, Any],
-    criteria_info: CriteriaInfo
+    criteria_info: CriteriaInfo,
+    t: Callable,
 ) -> List[str]:
-    """
-    Build criteria details for a single issue.
-    
-    Args:
-        result: Single analysis result dictionary.
-        criteria_info: CriteriaInfo object with criteria metadata.
-    
-    Returns:
-        List of markdown strings with criteria details or empty list.
-    """
+    """Build criteria details for a single issue."""
     criteria = result.get("criteria") or result.get('analysis', {}).get("criteria", {})
-    
+
     if not isinstance(criteria, dict) or not criteria:
         return []
 
     lines = [
-        "#### Criteria Details",
+        f"#### {t('criteria_details_section')}",
         "",
-        _markdown_table_row(["Criterion", "Score", "Review", "Recommendations"]),
+        _markdown_table_row([
+            t("table_header_criterion"),
+            t("score"),
+            t("review"),
+            t("recommendations"),
+        ]),
         _markdown_table_row(["---", "---", "---", "---"]),
     ]
 
     for criterion_key in criteria_info.keys:
         criterion_result = criteria.get(criterion_key, {})
-        
+
         if not isinstance(criterion_result, dict):
             continue
-        
+
         title = criterion_result.get(
             "title",
             criterion_key.replace("_", " ").title(),
         )
-        score = criterion_result.get("score", "N/A")
+        score = criterion_result.get("score", t("na_value"))
         review = criterion_result.get("review", "")
         recs = criterion_result.get("recommendations", [])
-        
+
         if isinstance(recs, list):
             recommendation = "  ".join(
                 [f"{i+1}. {r.strip()}" for i, r in enumerate(recs) if r.strip()]
             )
         else:
             recommendation = str(recs) if recs else ""
-        
+
         lines.append(_markdown_table_row([title, score, review, recommendation]))
 
     return lines + [""]
 
 
-def _build_issue_conclusion_section(result: Dict[str, Any]) -> List[str]:
-    """
-    Build conclusion and diagnosis sections for a single issue.
-    
-    Args:
-        result: Single analysis result dictionary.
-    
-    Returns:
-        List of markdown strings with conclusions or empty list.
-    """
+def _build_issue_conclusion_section(
+    result: Dict[str, Any],
+    t: Callable,
+) -> List[str]:
+    """Build conclusion and diagnosis sections for a single issue."""
     lines = []
 
     if "error" in result:
         lines.extend([
-            "#### Error",
+            f"#### {t('error_section')}",
             "",
             str(result["error"]),
             "",
@@ -470,7 +415,7 @@ def _build_issue_conclusion_section(result: Dict[str, Any]) -> List[str]:
         )
         if conclusion:
             lines.extend([
-                "#### Overall Conclusion",
+                f"#### {t('overall_conclusion')}",
                 "",
                 str(conclusion),
                 "",
@@ -482,7 +427,7 @@ def _build_issue_conclusion_section(result: Dict[str, Any]) -> List[str]:
         )
         if diagnosis:
             lines.extend([
-                "#### Diagnosis",
+                f"#### {t('diagnosis')}",
                 "",
                 str(diagnosis),
                 "",
@@ -491,23 +436,18 @@ def _build_issue_conclusion_section(result: Dict[str, Any]) -> List[str]:
     return lines
 
 
-def _build_issue_description_section(result: Dict[str, Any]) -> List[str]:
-    """
-    Build original description section for a single issue.
-    
-    Args:
-        result: Single analysis result dictionary.
-    
-    Returns:
-        List of markdown strings with original description or empty list.
-    """
+def _build_issue_description_section(
+    result: Dict[str, Any],
+    t: Callable,
+) -> List[str]:
+    """Build original description section for a single issue."""
     description = result.get("input_description")
-    
+
     if not description:
         return []
 
     return [
-        "#### Original Description",
+        f"#### {t('original_description')}",
         "",
         "```",
         str(description),
@@ -519,19 +459,7 @@ def _build_issue_description_section(result: Dict[str, Any]) -> List[str]:
 def _extract_criterion_score_by_key(
     result: Dict[str, Any], criterion_key: str
 ) -> Any | None:
-    """
-    Extract score for a specific criterion from a result.
-    
-    Searches for the criterion score in both the 'criteria' and
-    'criteria_scores' structures within the result.
-    
-    Args:
-        result: Analysis result dictionary containing score data.
-        criterion_key: Key identifying the criterion to extract.
-    
-    Returns:
-        The extracted score value or None if not found.
-    """
+    """Extract score for a specific criterion from a result."""
     criteria = result.get("criteria")
     if isinstance(criteria, dict):
         criterion_result = criteria.get(criterion_key)
@@ -545,20 +473,21 @@ def _extract_criterion_score_by_key(
     return None
 
 
-def save_markdown_report(results: List[Dict[str, Any]], output_path: str) -> None:
-    """
-    Save the generated Markdown report to a file.
-    
+def save_markdown_report(
+    results: List[Dict[str, Any]],
+    output_path: str,
+    t: Callable | None = None,
+) -> None:
+    """Save the generated Markdown report to a file.
+
     Args:
         results: List of analysis result dictionaries.
         output_path: File path where the report should be saved.
-    
-    Raises:
-        Exception: If file writing fails.
+        t: Optional translation function. Falls back to English if not provided.
     """
     try:
         with open(output_path, "w", encoding="utf-8") as file:
-            file.write(build_markdown_report(results))
+            file.write(build_markdown_report(results, t=t))
         logger.info(f"Saved Markdown report to {output_path}")
     except Exception as e:
         logger.error(f"Failed to save Markdown report: {e}")
@@ -566,15 +495,7 @@ def save_markdown_report(results: List[Dict[str, Any]], output_path: str) -> Non
 
 
 def _extract_criterion_scores(result: Dict[str, Any]) -> List[Any]:
-    """
-    Extract all criterion scores from a result dictionary.
-    
-    Args:
-        result: Analysis result containing score data.
-    
-    Returns:
-        List of extracted scores, empty list if none found.
-    """
+    """Extract all criterion scores from a result dictionary."""
     criteria = result.get("criteria")
     if isinstance(criteria, dict) and criteria:
         scores = []
@@ -592,53 +513,21 @@ def _extract_criterion_scores(result: Dict[str, Any]) -> List[Any]:
 
 
 def _markdown_table_row(values: List[Any]) -> str:
-    """
-    Format a list of values as a Markdown table row.
-    
-    Escapes special characters and formats as a pipe-delimited table row.
-    
-    Args:
-        values: List of values to include in the table row.
-    
-    Returns:
-        Formatted Markdown table row string.
-    """
+    """Format a list of values as a Markdown table row."""
     return "| " + " | ".join(_escape_table_cell(value) for value in values) + " |"
 
 
 def _escape_table_cell(value: Any) -> str:
-    """
-    Escape special characters for Markdown table cell compatibility.
-    
-    Replaces pipe characters with escaped versions and collapses newlines.
-    
-    Args:
-        value: Value to escape.
-    
-    Returns:
-        Escaped string safe for use in Markdown table cells.
-    """
+    """Escape special characters for Markdown table cell compatibility."""
     return str(value).replace("|", "\\|").replace("\n", " ")
 
 
 def _is_zombie_task(result: Dict[str, Any], days_threshold: int = 30) -> bool:
-    """
-    Determine if a task has not been updated for a specified period.
-    
-    Checks the updated_at timestamp against a threshold to identify
-    potentially abandoned or stale tasks.
-    
-    Args:
-        result: Analysis result containing updated_at timestamp.
-        days_threshold: Number of days without update to consider zombie status.
-    
-    Returns:
-        True if the task has not been updated within the threshold period.
-    """
+    """Determine if a task has not been updated for a specified period."""
     updated_at_str = result.get("updated_at")
     if not updated_at_str:
         return False
-    
+
     try:
         updated_at = datetime.fromisoformat(
             updated_at_str.replace('Z', '+03:00') if 'Z' in updated_at_str else updated_at_str

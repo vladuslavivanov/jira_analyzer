@@ -1,5 +1,6 @@
 """Results Viewer for browsing SQLite analysis results."""
 
+import json
 from typing import Any, Dict, List, Callable
 
 import pandas as pd
@@ -92,7 +93,7 @@ class ResultsViewer:
                     validated_results.append(validated_result)
                 except Exception as validation_error:
                     # Skip malformed results but continue processing others
-                    st.warning(f"Skipping malformed result: {validation_error}")
+                    st.warning(self.t("skipping_malformed", error=validation_error))
                     continue
             
             return validated_results
@@ -120,9 +121,10 @@ class ResultsViewer:
         # Analysis run filter
         analysis_runs = st.session_state.get("analysis_runs", [])
         if analysis_runs:
-            run_options = [("All Runs", None)] + [(r.get("run_name", f"Run {r['run_id']}"), r['run_id']) for r in analysis_runs]
+            all_runs_label = self.t("all_runs")
+            run_options = [(all_runs_label, None)] + [(r.get("run_name", f"Run {r['run_id']}"), r['run_id']) for r in analysis_runs]
             run_filter = st.selectbox(
-                "Analysis Run",
+                self.t("analysis_run_label"),
                 options=[name for name, _ in run_options],
                 index=0,
                 key="run_filter",
@@ -142,7 +144,14 @@ class ResultsViewer:
         with filter_container:
             status_filter = st.selectbox(
                 self.t("filter_by_status"),
-                options=["All", "Completed", "Failed"],
+                options=["All", "Pending", "Processing", "Completed", "Failed"],
+                format_func=lambda x: {
+                    "All": self.t("filter_all"),
+                    "Pending": self.t("filter_pending"),
+                    "Processing": self.t("filter_processing"),
+                    "Completed": self.t("filter_completed"),
+                    "Failed": self.t("filter_failed"),
+                }.get(x, x),
                 key="status_filter",
             )
 
@@ -158,15 +167,26 @@ class ResultsViewer:
         # Display results as selectable items (not spoilers/expanders)
         for result in filtered_results:
             task_id = result.get("task_id", "Unknown")
-            title = result.get("title", "No title")
+            title = result.get("title") or self.t("no_title")
 
             # Create clickable card for each result
             is_selected = task_id == st.session_state.selected_result_id
             card_color = "primary" if is_selected else "secondary"
             
+            # Determine state indicator (all states except completed get an emoji)
+            state = result.get("state", "PENDING")
+            if state == "PENDING":
+                state_prefix = "⏳ "
+            elif state == "PROCESSING":
+                state_prefix = "🔄 "
+            elif state == "FAILED":
+                state_prefix = "❌ "
+            else:
+                state_prefix = ""      # completed or unknown — no emoji
+
             # Use button to select the result (simple direct interaction)
             if st.button(
-                f"{self.t('issue_title', id=task_id, title=title)}",
+                f"{state_prefix}{self.t('issue_title', id=task_id, title=title)}",
                 key=f"select_{task_id}",
                 type=card_color,
             ):
@@ -199,7 +219,11 @@ class ResultsViewer:
 
         # Status filter - map UI-friendly values to database state values
         # Defensive filtering: handle None states and use exact matching
-        if status_filter == "Completed":
+        if status_filter == "Pending":
+            filtered = [r for r in filtered if r.get("state") == "PENDING"]
+        elif status_filter == "Processing":
+            filtered = [r for r in filtered if r.get("state") == "PROCESSING"]
+        elif status_filter == "Completed":
             filtered = [r for r in filtered if r.get("state") == "COMPLETED"]
         elif status_filter == "Failed":
             filtered = [r for r in filtered if r.get("state") == "FAILED"]
@@ -246,25 +270,25 @@ class ResultsViewer:
         Args:
             result: Result dictionary.
         """
-        st.header("📋 Brief Analysis Details")
+        st.header(f"📋 {self.t('brief_analysis_details')}")
 
         # Manual table implementation for cleaner formatting
         col1, col2 = st.columns(2)
         with col1:
-            st.metric("Task ID", result.get("task_id", "N/A"), label_visibility="visible")
-            st.metric("Status", result.get("state", "N/A"), label_visibility="visible")
-            st.metric("Analysis Date", self._format_date(result.get("analyzed_at")), label_visibility="visible")
+            st.metric(self.t("task_id"), result.get("task_id", "N/A"), label_visibility="visible")
+            st.metric(self.t("status"), result.get("state", "N/A"), label_visibility="visible")
+            st.metric(self.t("analyzed_at"), self._format_date(result.get("analyzed_at")), label_visibility="visible")
         with col2:
-            st.metric("Assignee", result.get("assignee", "N/A"), label_visibility="visible")
-            st.metric("Creation Date", self._format_date(result.get("created_at")), label_visibility="visible")
+            st.metric(self.t("assignee"), result.get("assignee", "N/A"), label_visibility="visible")
+            st.metric(self.t("created_at"), self._format_date(result.get("created_at")), label_visibility="visible")
 
         # Task Description
-        st.subheader("📝 Task Description")
+        st.subheader(f"📝 {self.t('task_description')}")
         description = result.get("description", "")
         if description:
             st.text_area("Description", value=description, disabled=True, height=200, label_visibility="collapsed")
         else:
-            st.info("No description available")
+            st.info(self.t("no_description"))
 
     def _format_date(self, date_str: str | None) -> str:
         """Format date string for display.
@@ -294,50 +318,79 @@ class ResultsViewer:
         try:
             analysis_run = self.repository.get_analysis_run(run_id)
             if analysis_run:
-                with st.expander("⚙️ Analysis Configuration (Click to expand)", expanded=False):
+                with st.expander(f"⚙️ {self.t('analysis_configuration')}", expanded=False):
                     # Run metadata
                     metadata_col1, metadata_col2 = st.columns(2)
                     with metadata_col1:
-                        st.write(f"**Run Name:** {analysis_run.get('run_name', f'Run {run_id}')}")
-                        st.write(f"**Created:** {self._format_date(analysis_run.get('created_at'))}")
+                        st.write(f"**{self.t('run_name_label')}:** {analysis_run.get('run_name', f'Run {run_id}')}")
+                        st.write(f"**{self.t('label_created')}:** {self._format_date(analysis_run.get('created_at'))}")
                     with metadata_col2:
                         include_overall = analysis_run.get("include_overall_conclusion", True)
-                        st.write(f"**Include Overall Conclusion:** {'Yes' if include_overall else 'No'}")
+                        st.write(f"**{self.t('label_include_overall')}:** {self.t('yes') if include_overall else self.t('no')}")
                         split_by_criterion = analysis_run.get("split_by_criterion", False)
-                        st.write(f"**Split By Criterion:** {'Yes' if split_by_criterion else 'No'}")
+                        st.write(f"**{self.t('label_split_by_criterion')}:** {self.t('yes') if split_by_criterion else self.t('no')}")
                         reasoning_enabled = analysis_run.get("reasoning_enabled", False)
-                        st.write(f"**LLM Reasoning Mode:** {'Enabled' if reasoning_enabled else 'Disabled'}")
+                        st.write(f"**{self.t('label_reasoning_mode')}:** {self.t('label_enabled') if reasoning_enabled else self.t('label_disabled')}")
                         if reasoning_enabled:
                             reasoning_effort = analysis_run.get("reasoning_effort", 'high')
-                            st.write(f"**Reasoning Effort:** {reasoning_effort.capitalize()}" )
+                            st.write(f"**{self.t('label_reasoning_effort')}:** {reasoning_effort.capitalize()}" )
                     
                     st.divider()
                     
                     # Display run configuration details
                     if analysis_run.get("system_prompt"):
-                        st.subheader("🤖 System Prompt")
-                        st.text_area("System Prompt", value=analysis_run.get("system_prompt", ""), height=80, disabled=True, label_visibility="collapsed")
+                        st.subheader(f"🤖 {self.t('system_prompt')}")
+                        st.text_area(self.t("system_prompt"), value=analysis_run.get("system_prompt", ""), height=80, disabled=True, label_visibility="collapsed")
                     
                     if analysis_run.get("general_prompt"):
-                        st.subheader("📋 General Prompt")
-                        st.text_area("General Prompt", value=analysis_run.get("general_prompt", ""), height=80, disabled=True, label_visibility="collapsed")
+                        st.subheader(f"📋 {self.t('general_prompt')}")
+                        st.text_area(self.t("general_prompt"), value=analysis_run.get("general_prompt", ""), height=80, disabled=True, label_visibility="collapsed")
                     
                     # Display criteria definitions summary
                     criteria = self.repository.get_criteria(run_id)
                     if criteria:
-                        st.subheader(f"📏 Criteria Definitions ({len(criteria)} criteria)")
-                        with st.expander("📋 View All Criteria Definitions", expanded=False):
+                        st.subheader(f"📏 {self.t('criteria_definitions_count', count=len(criteria))}")
+                        with st.expander(f"📋 {self.t('view_all_criteria_definitions')}", expanded=False):
                             for i, criterion in enumerate(criteria, 1):
-                                st.markdown(f"**{i}. {criterion.get('title', 'Unknown Criterion')}**")
+                                st.markdown(f"**{i}. {criterion.get('title', self.t('unknown_criterion'))}**")
                                 if criterion.get('description'):
                                     st.markdown(f"*{criterion.get('description')}*")
-                                st.write(f"**Scoring System:** {criterion.get('scoring_system', 'percent')}")
+                                st.write(f"**{self.t('scoring_system')}:** {criterion.get('scoring_system', 'percent')}")
                                 if criterion.get('include_review'):
-                                    st.write("*Includes review*")
+                                    st.write(f"*{self.t('includes_review_label')}*")
                                 st.divider()
-                            
+
+                    # Export button
+                    export_data = {
+                        "version": 1,
+                        "run_name": analysis_run.get("run_name", f"Run {run_id}"),
+                        "created_at": analysis_run.get("created_at", ""),
+                        "system_prompt": analysis_run.get("system_prompt", ""),
+                        "general_prompt": analysis_run.get("general_prompt", ""),
+                        "include_overall_conclusion": analysis_run.get("include_overall_conclusion", True),
+                        "split_by_criterion": analysis_run.get("split_by_criterion", False),
+                        "reasoning_enabled": analysis_run.get("reasoning_enabled", False),
+                        "reasoning_effort": analysis_run.get("reasoning_effort", "high"),
+                        "criteria": [
+                            {
+                                "title": c.get("title", ""),
+                                "description": c.get("description", ""),
+                                "scoring_system": c.get("scoring_system", "percent"),
+                                "include_review": bool(c.get("include_review", False)),
+                            }
+                            for c in (criteria or [])
+                        ],
+                    }
+                    export_json = json.dumps(export_data, ensure_ascii=False, indent=2)
+                    st.download_button(
+                        label=self.t("export_config"),
+                        data=export_json,
+                        file_name=f"analysis_config_run_{run_id}.json",
+                        mime="application/json",
+                        use_container_width=True,
+                    )
         except Exception as e:
-            st.warning(f"Could not load analysis configuration: {e}")
+            st.warning(self.t("loaded_config_error", error=e))
 
     def _display_analysis_result(self, result: Dict[str, Any]) -> None:
         """Display detailed analysis results.
@@ -346,7 +399,7 @@ class ResultsViewer:
             result: Result dictionary with analysis data.
         """
         st.divider()
-        st.header("📊 Analysis Results")
+        st.header(f"📊 {self.t('analysis_results')}")
 
         analysis = result.get("analysis", {})
         if not analysis:
@@ -356,20 +409,20 @@ class ResultsViewer:
         # Overall conclusion
         overall_conclusion = analysis.get("overall_conclusion")
         if overall_conclusion:
-            st.subheader("🎯 Overall Conclusion")
+            st.subheader(f"🎯 {self.t('overall_conclusion')}")
             st.markdown(overall_conclusion)
 
         # Criteria scores - Table formatted display
         criteria_scores = analysis.get("criteria_scores", {})
         criteria_full = analysis.get("criteria", {})
         if criteria_scores:
-            st.subheader("📈 Criteria Breakdown")
+            st.subheader(f"📈 {self.t('criteria_breakdown')}")
             self._display_criteria_scores_table(result, criteria_scores, criteria_full)
         else:
             # Legacy format: check for 'criteria' field
             criteria = analysis.get("criteria", {})
             if criteria:
-                st.subheader("📈 Criteria Breakdown")
+                st.subheader(f"📈 {self.t('criteria_breakdown')}")
                 self._display_legacy_criteria_table(criteria)
                 
         # Analysis Run Configuration (under cut)
@@ -458,21 +511,21 @@ class ResultsViewer:
             recommendations = criterion_data.get("recommendations", [])
             
             # Create expandable section with criterion name and score in title
-            expander_title = f"📊 {display_title} - Score: {score_display}"
+            expander_title = f"📊 {display_title} - {self.t('score')}: {score_display}"
             
             with st.expander(expander_title, expanded=False):
                 # Display score system
-                st.markdown(f"**📈 Score System:** {scoring_system}")
+                st.markdown(f"**📈 {self.t('score_system_label')}:** {scoring_system}")
                 
                 # Display fix recommendations
                 if recommendations and isinstance(recommendations, list):
-                    st.markdown("**🔧 Fix Recommendations:**")
+                    st.markdown(f"**🔧 {self.t('fix_recommendations_label')}:**")
                     for i, rec in enumerate(recommendations, 1):
                         st.markdown(f"  {i}. {rec}")
                 
                 # Display review
                 if review:
-                    st.markdown("**📝 Review:**")
+                    st.markdown(f"**📝 {self.t('review')}:**")
                     st.markdown(review)
     
     def _display_legacy_criteria_table(self, criteria: Dict[str, Any]) -> None:
@@ -491,11 +544,11 @@ class ResultsViewer:
                 score_display = f"{score:.1f}/10" if score is not None else "N/A"
                 
                 table_data.append({
-                    "Criterion Name": criterion_name,
-                    "Score": score_display,
-                    "Score System": "N/A",
-                    "Review": review[:100] + "..." if len(str(review)) > 100 else review,
-                    "Diagnosis": diagnosis[:100] + "..." if len(str(diagnosis)) > 100 else diagnosis,
+                    self.t("criterion_name"): criterion_name,
+                    self.t("score"): score_display,
+                    self.t("scoring_system"): "N/A",
+                    self.t("review"): review[:100] + "..." if len(str(review)) > 100 else review,
+                    self.t("diagnosis"): diagnosis[:100] + "..." if len(str(diagnosis)) > 100 else diagnosis,
                 })
         
         if table_data:
@@ -508,8 +561,8 @@ class ResultsViewer:
                     review = criterion_data.get("review", "")
                     diagnosis = criterion_data.get("diagnosis", "")
                     if review or diagnosis:
-                        with st.expander(f"📝 Details for: {criterion_name}", expanded=False):
+                        with st.expander(f"📝 {self.t('details_for_criterion', criterion_name=criterion_name)}", expanded=False):
                             if diagnosis:
-                                st.markdown(f"**Diagnosis:** {diagnosis}")
+                                st.markdown(f"**{self.t('diagnosis')}:** {diagnosis}")
                             if review:
-                                st.markdown(f"**Review:** {review}")
+                                st.markdown(f"**{self.t('review')}:** {review}")

@@ -19,12 +19,13 @@
 - [ ] add hints to prompt configuration UI: like "must describe scoring system: what is bad, what is good", general recommendations of prompt engeneering, etc.
 - [x] ensure independence from Deepseek LLM provider. Should be able easily add new LLM Provider
 - [x] LLM reasoning setting
-- [ ] extract localization configuratino to resource file
-- [ ] Title/Summary mismatch which leads to "No title" in results page in list.
-- [ ] Show processing status for tasks in list on results page.
-- [ ] Asignee is not provided on results page even if asignee for task is set.
-- [ ] Add ability to export analysis config from results page which was used for task
-- [ ] Wrong N/A value of Creation Date for real task in results page.
+- [x] extract localization configuratino to resource file
+- [x] Title/Summary mismatch which leads to "No title" in results page in list.
+- [x] Show processing status for tasks in list on results page.
+- [x] Asignee is not provided on results page even if asignee for task is set.
+- [x] Add ability to export analysis config from results page which was used for task
+- [x] Wrong N/A value of Creation Date for real task in results page.
+- [x] Run analysis twice when hit the button after analysis starts
 
 - [ ] experiments:
   - analyse AI model value:
