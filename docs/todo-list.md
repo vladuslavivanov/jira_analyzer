@@ -19,7 +19,7 @@
 - [ ] add hints to prompt configuration UI: like "must describe scoring system: what is bad, what is good", general recommendations of prompt engeneering, etc.
 - [x] ensure independence from Deepseek LLM provider. Should be able easily add new LLM Provider
 - [x] LLM reasoning setting
-- [ ] extract localization configuratino to resource file
+- [x] extract localization configuratino to resource file
 - [ ] Title/Summary mismatch which leads to "No title" in results page in list.
 - [ ] Show processing status for tasks in list on results page.
 - [ ] Asignee is not provided on results page even if asignee for task is set.
