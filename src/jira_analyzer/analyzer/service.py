@@ -249,16 +249,16 @@ class AnalysisService:
             async with sem:
                 task_id = issue.get("key") or issue.get("jira_key") or f"local_{idx}"
                 if self.repo:
-                    await asyncio.to_thread(self.repo.update_processing, task_id)
+                    await asyncio.to_thread(self.repo.update_processing, task_id, self.run_id)
 
                 try:
                     analysis = await self._async_analyze_issue(idx=idx, total=total, issue=issue)
                     if 'error' in analysis:
                         if self.repo:
-                            await asyncio.to_thread(self.repo.save_failed, task_id, analysis['error'])
+                            await asyncio.to_thread(self.repo.save_failed, task_id, analysis['error'], self.run_id)
                     else:
                         if self.repo:
-                            await asyncio.to_thread(self.repo.save_result, task_id, analysis)
+                            await asyncio.to_thread(self.repo.save_result, task_id, analysis, self.run_id)
                     return (idx, analysis)
                 except Exception as error:
                     logger.error(f"Analysis failed for issue {idx}/{total}: {error}")
@@ -272,7 +272,7 @@ class AnalysisService:
                         "updated_at": issue.get("updated_at", ""),
                     }
                     if self.repo:
-                        await asyncio.to_thread(self.repo.save_failed, task_id, str(error))
+                        await asyncio.to_thread(self.repo.save_failed, task_id, str(error), self.run_id)
                     return (idx, failed_result)
 
         tasks = [

@@ -49,7 +49,10 @@ class ResultsViewer:
 
         # Default to first result if no result is selected
         if st.session_state.selected_result_id is None:
-            st.session_state.selected_result_id = results[0].get("task_id")
+            first = results[0]
+            task_id = first.get("task_id")
+            run_id = first.get("run_id")
+            st.session_state.selected_result_id = f"{run_id}:{task_id}" if run_id else task_id
 
         # Create two-column layout (master-detail)
         col1, col2 = st.columns([1, 2])
@@ -167,10 +170,14 @@ class ResultsViewer:
         # Display results as selectable items (not spoilers/expanders)
         for result in filtered_results:
             task_id = result.get("task_id", "Unknown")
+            run_id = result.get("run_id")
             title = result.get("title") or self.t("no_title")
 
+            # Composite key to uniquely identify this (task, run) pair
+            result_key = f"{run_id}:{task_id}" if run_id else task_id
+
             # Create clickable card for each result
-            is_selected = task_id == st.session_state.selected_result_id
+            is_selected = result_key == st.session_state.selected_result_id
             card_color = "primary" if is_selected else "secondary"
             
             # Determine state indicator (all states except completed get an emoji)
@@ -187,10 +194,10 @@ class ResultsViewer:
             # Use button to select the result (simple direct interaction)
             if st.button(
                 f"{state_prefix}{self.t('issue_title', id=task_id, title=title)}",
-                key=f"select_{task_id}",
+                key=f"select_{result_key}",
                 type=card_color,
             ):
-                st.session_state.selected_result_id = task_id
+                st.session_state.selected_result_id = result_key
                 st.rerun()
 
     def _filter_results(
@@ -201,6 +208,10 @@ class ResultsViewer:
         selected_run_id: int | None = None,
     ) -> List[Dict[str, Any]]:
         """Filter results based on search text and filters.
+
+        When no specific run is selected (All Runs), results are deduplicated
+        so that only the most recent result per task is shown. When a specific
+        run is selected, all results from that run are shown.
 
         Args:
             results: List of all results.
@@ -215,7 +226,19 @@ class ResultsViewer:
 
         # Analysis run filter
         if selected_run_id is not None:
+            # Specific run: show all results from that run
             filtered = [r for r in filtered if r.get("run_id") == selected_run_id]
+        else:
+            # All Runs: deduplicate to latest result per task
+            seen = {}
+            for r in filtered:
+                task_id = r.get("task_id")
+                if task_id is None:
+                    continue
+                # Keep the entry with the highest run_id (most recent)
+                if task_id not in seen or (r.get("run_id") or 0) > (seen[task_id].get("run_id") or 0):
+                    seen[task_id] = r
+            filtered = list(seen.values())
 
         # Status filter - map UI-friendly values to database state values
         # Defensive filtering: handle None states and use exact matching
@@ -243,16 +266,25 @@ class ResultsViewer:
 
         return filtered
 
-    def _render_result_details(self, task_id: str) -> None:
+    def _render_result_details(self, result_key: str) -> None:
         """Render the right panel with detailed result information.
 
         Args:
-            task_id: ID of the result to display details for.
+            result_key: Composite key in format "{run_id}:{task_id}"
+                        or just "{task_id}" for results without a run.
         """
         st.subheader(self.t("result_details"))
 
+        # Parse composite key: "run_id:task_id" or just "task_id"
+        if ":" in result_key and result_key.count(":") == 1:
+            run_id_str, task_id = result_key.split(":", 1)
+            run_id = int(run_id_str) if run_id_str else None
+        else:
+            task_id = result_key
+            run_id = None
+
         # Get result from repository
-        result = self.repository.get_result(task_id)
+        result = self.repository.get_result(task_id, run_id)
 
         if not result:
             st.error(self.t("result_not_found", id=task_id))
