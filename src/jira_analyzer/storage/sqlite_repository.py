@@ -30,28 +30,19 @@ class SqliteAnalysisResultRepository(AnalysisResultRepository):
                     run_id INTEGER PRIMARY KEY AUTOINCREMENT,
                     run_name TEXT,
                     created_at TEXT,
-                    system_prompt TEXT,
-                    general_prompt TEXT,
-                    include_overall_conclusion INTEGER,
-                    split_by_criterion INTEGER DEFAULT 0,
-                    reasoning_enabled INTEGER DEFAULT 0,
-                    reasoning_effort TEXT DEFAULT 'high'
+                    config_id INTEGER
                 )
                 """
             )
             
-            # Create criteria table to store criterion definitions
+            # Create analysis_configs table to store deduplicated configs
             connection.execute(
                 """
-                CREATE TABLE IF NOT EXISTS criteria (
-                    criterion_id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    run_id INTEGER,
-                    title TEXT,
-                    description TEXT,
-                    scoring_system TEXT,
-                    include_review INTEGER DEFAULT 0,
-                    criterion_key TEXT,
-                FOREIGN KEY (run_id) REFERENCES analysis_runs(run_id)
+                CREATE TABLE IF NOT EXISTS analysis_configs (
+                    config_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    config_hash TEXT UNIQUE,
+                    config_json TEXT NOT NULL,
+                    created_at TEXT
                 )
                 """
             )
@@ -78,6 +69,14 @@ class SqliteAnalysisResultRepository(AnalysisResultRepository):
                 """
             )
             
+            # Migrate existing databases: add config_id column if missing
+            cursor = connection.execute("PRAGMA table_info(analysis_runs)")
+            columns = [row[1] for row in cursor.fetchall()]
+            if "config_id" not in columns:
+                connection.execute(
+                    "ALTER TABLE analysis_runs ADD COLUMN config_id INTEGER"
+                )
+            
             # Create indexes for better query performance
             connection.execute(
                 """
@@ -87,8 +86,8 @@ class SqliteAnalysisResultRepository(AnalysisResultRepository):
             )
             connection.execute(
                 """
-                CREATE INDEX IF NOT EXISTS idx_criteria_run_id 
-                ON criteria(run_id)
+                CREATE INDEX IF NOT EXISTS idx_analysis_configs_hash
+                ON analysis_configs(config_hash)
                 """
             )
             
@@ -332,6 +331,42 @@ class SqliteAnalysisResultRepository(AnalysisResultRepository):
         return []
 
     # Analysis run management methods
+
+    def _find_config_by_hash(self, config_hash: str) -> int | None:
+        """Find an existing config by its hash.
+        
+        Returns config_id if found, None otherwise.
+        """
+        with sqlite3.connect(self.database_path) as conn:
+            cursor = conn.execute(
+                "SELECT config_id FROM analysis_configs WHERE config_hash = ? LIMIT 1",
+                (config_hash,),
+            )
+            row = cursor.fetchone()
+            return row[0] if row else None
+
+    def _find_or_create_config(self, config_hash: str, config_json: str) -> int:
+        """Find an existing config by hash or create a new one.
+        
+        Returns the config_id.
+        """
+        if config_hash:
+            existing = self._find_config_by_hash(config_hash)
+            if existing is not None:
+                return existing
+
+        now = datetime.now(timezone(timedelta(hours=3))).isoformat()
+        with sqlite3.connect(self.database_path) as conn:
+            cursor = conn.execute(
+                """
+                INSERT INTO analysis_configs (config_hash, config_json, created_at)
+                VALUES (?, ?, ?)
+                """,
+                (config_hash, config_json, now),
+            )
+            conn.commit()
+            return cursor.lastrowid
+
     def create_analysis_run(
         self,
         run_name: str | None = None,
@@ -341,25 +376,32 @@ class SqliteAnalysisResultRepository(AnalysisResultRepository):
         split_by_criterion: bool = False,
         reasoning_enabled: bool = False,
         reasoning_effort: str = "high",
+        config_hash: str | None = None,
+        config_json: str | None = None,
     ) -> int:
-        """Create a new analysis run and return its ID."""
+        """Create a new analysis run and return its ID.
+        
+        The configuration (prompts, criteria, settings) is stored in the
+        analysis_configs table and deduplicated by config_hash. Each run
+        is an individual session referencing a config.
+        """
+        # Find or create the config (deduplicates by hash)
+        config_id = None
+        if config_hash and config_json:
+            config_id = self._find_or_create_config(config_hash, config_json)
+
         now = datetime.now(timezone(timedelta(hours=3))).isoformat()
         with sqlite3.connect(self.database_path) as conn:
             cursor = conn.execute(
                 """
                 INSERT INTO analysis_runs 
-                (run_name, created_at, system_prompt, general_prompt, include_overall_conclusion, split_by_criterion, reasoning_enabled, reasoning_effort)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                (run_name, created_at, config_id)
+                VALUES (?, ?, ?)
                 """,
                 (
                     run_name,
                     now,
-                    system_prompt,
-                    general_prompt,
-                    1 if include_overall_conclusion else 0,
-                    1 if split_by_criterion else 0,
-                    1 if reasoning_enabled else 0,
-                    reasoning_effort,
+                    config_id,
                 ),
             )
             conn.commit()
@@ -370,35 +412,21 @@ class SqliteAnalysisResultRepository(AnalysisResultRepository):
         run_id: int,
         criteria: list[dict]
     ) -> None:
-        """Save criteria definitions for an analysis run."""
-        with sqlite3.connect(self.database_path) as conn:
-            # Clear existing criteria for this run
-            conn.execute("DELETE FROM criteria WHERE run_id = ?", (run_id,))
-            
-            # Insert new criteria
-            for criterion in criteria:
-                conn.execute(
-                    """
-                    INSERT INTO criteria 
-                    (run_id, title, description, scoring_system, include_review, criterion_key)
-                    VALUES (?, ?, ?, ?, ?, ?)
-                    """,
-                    (
-                        run_id,
-                        criterion.get("title", ""),
-                        criterion.get("description", ""),
-                        criterion.get("scoring_system", "percent"),
-                        1 if criterion.get("include_review", False) else 0,
-                        criterion.get("key", ""),
-                    ),
-                )
-            conn.commit()
+        """Save criteria definitions for an analysis run.
+        
+        Criteria are stored inside the config JSON in analysis_configs,
+        so this is a no-op. Kept for interface compatibility.
+        """
 
     def get_analysis_run(self, run_id: int) -> Optional[Dict[str, Any]]:
-        """Get analysis run configuration by ID."""
+        """Get analysis run by ID.
+        
+        Merges config data (prompts, criteria, settings) from
+        analysis_configs when the run has a config_id reference.
+        """
         with sqlite3.connect(self.database_path) as conn:
             cursor = conn.execute(
-                "SELECT * FROM analysis_runs WHERE run_id = ?",
+                "SELECT run_id, run_name, created_at, config_id FROM analysis_runs WHERE run_id = ?",
                 (run_id,),
             )
             row = cursor.fetchone()
@@ -407,48 +435,99 @@ class SqliteAnalysisResultRepository(AnalysisResultRepository):
 
             columns = [description[0] for description in cursor.description]
             data = dict(zip(columns, row))
-            
-            # Convert boolean fields
-            data["include_overall_conclusion"] = bool(data.get("include_overall_conclusion", 1))
-            data["split_by_criterion"] = bool(data.get("split_by_criterion", 0))
-            
+
+            # Merge config data from analysis_configs
+            config_id = data.get("config_id")
+            if config_id is not None:
+                config_cursor = conn.execute(
+                    "SELECT config_json FROM analysis_configs WHERE config_id = ?",
+                    (config_id,),
+                )
+                config_row = config_cursor.fetchone()
+                if config_row:
+                    try:
+                        config_data = json.loads(config_row[0])
+                        for key in ("system_prompt", "general_prompt", "include_overall_conclusion", "split_by_criterion", "reasoning_enabled", "reasoning_effort"):
+                            if key in config_data:
+                                data[key] = config_data[key]
+                    except json.JSONDecodeError:
+                        pass
+
             return data
 
     def get_analysis_runs(self) -> List[Dict[str, Any]]:
-        """Get all analysis runs."""
+        """Get all analysis runs.
+        
+        Merges config data from analysis_configs when available.
+        """
         with sqlite3.connect(self.database_path) as conn:
             cursor = conn.execute(
-                "SELECT * FROM analysis_runs ORDER BY created_at DESC"
+                "SELECT run_id, run_name, created_at, config_id FROM analysis_runs ORDER BY created_at DESC"
             )
             rows = cursor.fetchall()
             results = []
             for row in rows:
                 columns = [desc[0] for desc in cursor.description]
                 data = dict(zip(columns, row))
-                
-                # Convert boolean fields
-                data["include_overall_conclusion"] = bool(data.get("include_overall_conclusion", 1))
-                data["split_by_criterion"] = bool(data.get("split_by_criterion", 0))
-                
+
+                # Merge config data from analysis_configs
+                config_id = data.get("config_id")
+                if config_id is not None:
+                    config_cursor = conn.execute(
+                        "SELECT config_json FROM analysis_configs WHERE config_id = ?",
+                        (config_id,),
+                    )
+                    config_row = config_cursor.fetchone()
+                    if config_row:
+                        try:
+                            config_data = json.loads(config_row[0])
+                            for key in ("system_prompt", "general_prompt", "include_overall_conclusion", "split_by_criterion", "reasoning_enabled", "reasoning_effort"):
+                                if key in config_data:
+                                    data[key] = config_data[key]
+                        except json.JSONDecodeError:
+                            pass
+
                 results.append(data)
             return results
 
     def get_criteria(self, run_id: int) -> List[Dict[str, Any]]:
-        """Get criteria definitions for an analysis run."""
+        """Get criteria definitions for an analysis run.
+        
+        Criteria are read from the config JSON stored in analysis_configs.
+        Returns an empty list if the run has no config reference.
+        """
         with sqlite3.connect(self.database_path) as conn:
             cursor = conn.execute(
-                "SELECT * FROM criteria WHERE run_id = ? ORDER BY criterion_id",
+                "SELECT config_id FROM analysis_runs WHERE run_id = ?",
                 (run_id,),
             )
-            rows = cursor.fetchall()
-            results = []
-            if rows:
-                for row in rows:
-                    columns = [desc[0] for desc in cursor.description]
-                    data = dict(zip(columns, row))
-                    
-                    # Convert boolean fields
-                    data["include_review"] = bool(data.get("include_review", 0))
-                    
-                    results.append(data)
-            return results
+            run_row = cursor.fetchone()
+            if not run_row:
+                return []
+            config_id = run_row[0]
+            if config_id is None:
+                return []
+
+            config_cursor = conn.execute(
+                "SELECT config_json FROM analysis_configs WHERE config_id = ?",
+                (config_id,),
+            )
+            config_row = config_cursor.fetchone()
+            if not config_row:
+                return []
+
+            try:
+                config_data = json.loads(config_row[0])
+                criteria = config_data.get("criteria", [])
+                return [
+                    {
+                        "title": c.get("title", ""),
+                        "description": c.get("description", ""),
+                        "scoring_system": c.get("scoring_system", "percent"),
+                        "include_review": bool(c.get("include_review", False)),
+                        "criterion_key": c.get("key", ""),
+                    }
+                    for c in criteria
+                ]
+            except json.JSONDecodeError:
+                return []

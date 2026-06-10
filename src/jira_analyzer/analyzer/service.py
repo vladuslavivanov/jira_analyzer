@@ -1,3 +1,4 @@
+import hashlib
 import json
 import re
 from datetime import datetime, timedelta, timezone
@@ -67,12 +68,24 @@ class AnalysisService:
         self,
         run_name: str | None = None,
     ) -> int:
-        """Create a new analysis run and store the analysis configuration."""
+        """Create a new analysis run and store the analysis configuration.
+        
+        The configuration (prompts, criteria, reasoning settings) is stored
+        in a separate config store (analysis_configs table) and deduplicated
+        by content hash. Each run is an individual session referencing a
+        config — runs never share IDs even when configs are identical.
+        
+        If no run_name is given, defaults to the current date/time.
+        """
         if not self.repo:
             raise ValueError("Repository required to create analysis run")
         
         if not self.prompt_config:
             raise ValueError("Prompt configuration required to create analysis run")
+        
+        # Default run_name to current datetime
+        if run_name is None:
+            run_name = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         
         # Convert criteria to dict format for storage
         criteria_list = [
@@ -89,7 +102,29 @@ class AnalysisService:
         # Derive reasoning_enabled from reasoning_effort for DB storage
         db_reasoning_enabled = self.reasoning_effort != "none"
         
+        # Sort criteria deterministically so hash is stable
+        sorted_criteria = sorted(criteria_list, key=lambda c: (c.get("key", ""), c.get("title", "")))
+        
+        # Build full config dict
+        config_dict = {
+            "system_prompt": self.prompt_config.system_prompt,
+            "general_prompt": self.prompt_config.general_prompt,
+            "include_overall_conclusion": self.prompt_config.include_overall_conclusion,
+            "split_by_criterion": self.split_by_criterion,
+            "reasoning_enabled": db_reasoning_enabled,
+            "reasoning_effort": self.reasoning_effort,
+            "criteria": sorted_criteria,
+        }
+        
+        # Serialize to JSON deterministically
+        config_json = json.dumps(config_dict, sort_keys=True, ensure_ascii=False)
+        
+        # Compute hash from the same serialization (ensures consistency)
+        config_hash = hashlib.sha256(config_json.encode("utf-8")).hexdigest()
+        
         # Create the analysis run
+        # The repository will store the config separately (deduplicated by hash)
+        # and create a new run referencing it.
         run_id = self.repo.create_analysis_run(
             run_name=run_name,
             system_prompt=self.prompt_config.system_prompt,
@@ -98,9 +133,11 @@ class AnalysisService:
             split_by_criterion=self.split_by_criterion,
             reasoning_enabled=db_reasoning_enabled,
             reasoning_effort=self.reasoning_effort,
+            config_hash=config_hash,
+            config_json=config_json,
         )
         
-        # Store the criteria for this run
+        # Save criteria (if the run uses config-based storage, this is a no-op)
         self.repo.save_criteria(run_id, criteria_list)
         
         # Update the service to use this run
