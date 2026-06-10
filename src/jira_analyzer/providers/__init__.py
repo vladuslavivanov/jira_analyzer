@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from typing import Dict
 
 from jira_analyzer.providers.base import BaseLLMProvider, LLMMessage, LLMResponse

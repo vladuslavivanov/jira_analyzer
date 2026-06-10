@@ -1,10 +1,8 @@
 """Analysis configuration dataclasses for type-safe config handling."""
 
-from __future__ import annotations
-
 import json
 from dataclasses import dataclass, field, asdict
-from typing import Any, Literal
+from typing import Any, Literal, Self
 
 ScoringSystem = Literal["binary", "percent", "five"]
 
@@ -57,7 +55,7 @@ class AnalysisConfig:
         return json.dumps(self.to_dict(), ensure_ascii=False, **kwargs)
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> AnalysisConfig:
+    def from_dict(cls, data: dict[str, Any]) -> Self:
         """Deserialize from a dict (tolerant of missing/extra keys)."""
         if not isinstance(data, dict):
             raise ValueError("Root value must be a JSON object.")
