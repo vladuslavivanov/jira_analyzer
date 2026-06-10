@@ -3,6 +3,8 @@ import re
 from pathlib import Path
 from typing import TextIO
 
+import pyjson5
+
 from jira_analyzer.analyzer.core.config import (
     AnalysisConfig,
     CriterionDefinition,
@@ -34,14 +36,14 @@ def _load_criteria_config() -> list[CriterionDefinition]:
     
     try:
         with open(_DEFAULT_CONFIG_PATH, encoding="utf-8") as f:
-            data = json.load(f)
+            data = pyjson5.load(f)
         # Support both the legacy bare-array format and the unified object format
         if isinstance(data, dict):
             criteria_data = data.get("criteria", [])
         else:
             criteria_data = data
         return [CriterionDefinition(**criterion) for criterion in criteria_data]
-    except (json.JSONDecodeError, TypeError, ValueError) as e:
+    except (json.JSONDecodeError, pyjson5.Json5DecoderException, TypeError, ValueError) as e:
         raise ValueError(f"Invalid criteria configuration file: {e}") from e
 
 
@@ -52,8 +54,8 @@ def _load_instructions() -> dict[str, dict[str, str]]:
     
     try:
         with open(_INSTRUCTIONS_PATH, encoding="utf-8") as f:
-            return json.load(f)
-    except (json.JSONDecodeError, TypeError, ValueError) as e:
+            return pyjson5.load(f)
+    except (json.JSONDecodeError, pyjson5.Json5DecoderException, TypeError, ValueError) as e:
         raise ValueError(f"Invalid instructions configuration file: {e}") from e
 
 

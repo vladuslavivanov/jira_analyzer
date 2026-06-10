@@ -7,6 +7,8 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qs, unquote, urlparse
 
+import pyjson5
+
 DEFAULT_HOST = "0.0.0.0"
 DEFAULT_PORT = 8081
 DEFAULT_DATA_FILE = (
@@ -16,7 +18,7 @@ DEFAULT_DATA_FILE = (
 
 def load_issues(path: Path = DEFAULT_DATA_FILE) -> dict[str, dict[str, Any]]:
     with path.open("r", encoding="utf-8") as file:
-        issues = json.load(file)
+        issues = pyjson5.load(file)
 
     if not isinstance(issues, list):
         raise ValueError("Mock Jira data file must contain a JSON array")

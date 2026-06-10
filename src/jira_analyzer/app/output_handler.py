@@ -4,6 +4,8 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Callable, Dict, List
 
+import pyjson5
+
 from jira_analyzer.storage.sqlite_repository import SqliteAnalysisResultRepository
 from jira_analyzer.utils.logger import setup_logger
 
@@ -20,7 +22,7 @@ def _get_default_translate() -> Callable[[str], str]:
         path = Path(__file__).resolve().parent.parent.parent.parent / "resources" / "translations" / "en.json"
         try:
             with open(path, encoding="utf-8") as f:
-                _DEFAULT_TRANSLATIONS = json.load(f)
+                _DEFAULT_TRANSLATIONS = pyjson5.load(f)
         except Exception:
             _DEFAULT_TRANSLATIONS = {}
 

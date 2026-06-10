@@ -3,6 +3,8 @@ from pathlib import Path
 import os
 from typing import cast
 
+import pyjson5
+
 import pandas as pd
 import streamlit as st
 
@@ -52,7 +54,7 @@ def _load_translations() -> dict[str, dict[str, str]]:
     for lang_file in _TRANSLATIONS_DIR.glob("*.json"):
         lang = lang_file.stem
         with open(lang_file, encoding="utf-8") as f:
-            translations[lang] = json.load(f)
+            translations[lang] = pyjson5.load(f)
     return translations
 
 
@@ -279,7 +281,7 @@ def _render_prompt_editor(t) -> AnalysisConfig:
                 try:
                     if uploaded_config is not None:
                         st.session_state.pending_analysis_prompt_config = (
-                            _normalize_prompt_config(json.load(uploaded_config))
+                            _normalize_prompt_config(pyjson5.load(uploaded_config))
                         )
                         st.rerun()
                 except Exception as error:
@@ -550,7 +552,7 @@ def _load_issues(
 
 def _load_json_issues(uploaded_file, use_sample: bool, t) -> list[dict]:
     if uploaded_file is not None:
-        data = json.load(uploaded_file)
+        data = pyjson5.load(uploaded_file)
         if not isinstance(data, list):
             raise ValueError(t("invalid_json"))
         return data
