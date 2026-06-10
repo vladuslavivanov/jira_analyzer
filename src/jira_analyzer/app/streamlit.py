@@ -761,14 +761,6 @@ def _render_analysis_page(
                 ):
                     repo = SqliteAnalysisResultRepository(db_path)
 
-                    if source == "Jira":
-                        if jira_query_mode == "Issue key":
-                            run_name = f"Issue Analysis: {jira_issue}"
-                        else:
-                            run_name = f"JQL Analysis: {jira_jql[:50]}..."
-                    else:
-                        run_name = "JSON Dataset Analysis"
-
                     service = AnalysisService(
                         prompt_config=prompt_config,
                         worker_count=int(worker_count),
@@ -776,7 +768,8 @@ def _render_analysis_page(
                         repo=repo,
                         reasoning_effort=reasoning_effort,
                     )
-                    run_id = service.create_analysis_run(run_name=run_name)
+                    # No run_name passed — the service uses current datetime
+                    run_id = service.create_analysis_run()
                     st.session_state.current_run_id = run_id
                     results = service.analyze_issues(issues)
 

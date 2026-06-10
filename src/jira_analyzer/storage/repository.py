@@ -51,8 +51,19 @@ class AnalysisResultRepository(ABC):
         split_by_criterion: bool = False,
         reasoning_enabled: bool = False,
         reasoning_effort: str = "high",
+        config_hash: str | None = None,
+        config_json: str | None = None,
     ) -> int:
-        """Create a new analysis run and return its ID."""
+        """Create a new analysis run and return its ID.
+        
+        The configuration (prompts, criteria, settings) should be stored
+        in a separate config store (e.g. analysis_configs table) and
+        deduplicated by config_hash. Each run is an individual session
+        referencing a config via config_id.
+        
+        Legacy implementations may ignore config_hash/config_json and
+        store config fields directly on the run.
+        """
         raise NotImplementedError()
 
     def save_criteria(
