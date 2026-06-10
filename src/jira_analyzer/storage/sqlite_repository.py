@@ -721,7 +721,7 @@ class SqliteAnalysisResultRepository(AnalysisResultRepository):
                         "description": c.get("description", ""),
                         "scoring_system": c.get("scoring_system", "percent"),
                         "include_review": bool(c.get("include_review", False)),
-                        "criterion_key": c.get("key", ""),
+                        "key": c.get("key", ""),
                     }
                     for c in criteria
                 ]

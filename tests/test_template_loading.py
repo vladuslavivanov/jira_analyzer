@@ -1,6 +1,5 @@
+from jira_analyzer.analyzer.core.config import AnalysisConfig, CriterionDefinition
 from jira_analyzer.analyzer.core.llm.prompt_builder import (
-    AnalysisPromptConfig,
-    CriterionConfig,
     _format_criterion,
     _load_template,
     build_prompt_from_template,
@@ -76,7 +75,7 @@ def test_build_prompt_from_template_with_complex_values():
 
 def test_build_structured_prompt_replaces_element_type():
     """Test that structured prompt replaces element_type placeholder."""
-    config = AnalysisPromptConfig(
+    config = AnalysisConfig(
         system_prompt="Test system",
         general_prompt="Test general",
         criteria=[],
@@ -91,7 +90,7 @@ def test_build_structured_prompt_replaces_element_type():
 
 def test_build_structured_prompt_replaces_description():
     """Test that structured prompt replaces description placeholder."""
-    config = AnalysisPromptConfig(
+    config = AnalysisConfig(
         system_prompt="Test system",
         general_prompt="Test general", 
         criteria=[],
@@ -106,7 +105,7 @@ def test_build_structured_prompt_replaces_description():
 
 def test_build_structured_prompt_replaces_general_prompt():
     """Test that structured prompt replaces general_prompt placeholder."""
-    config = AnalysisPromptConfig(
+    config = AnalysisConfig(
         system_prompt="Test system",
         general_prompt="Analyze this issue thoroughly",
         criteria=[],
@@ -121,7 +120,7 @@ def test_build_structured_prompt_replaces_general_prompt():
 
 def test_format_criterion_replaces_all_placeholders():
     """Test that _format_criterion replaces all criterion-related placeholders."""
-    criterion = CriterionConfig(
+    criterion = CriterionDefinition(
         title="Test Criterion",
         description="A test criterion description",
         scoring_system="percent",
@@ -142,7 +141,7 @@ def test_format_criterion_replaces_all_placeholders():
 
 def test_format_criterion_without_include_review():
     """Test criterion formatting when review is not included."""
-    criterion = CriterionConfig(
+    criterion = CriterionDefinition(
         title="Simple Criterion",
         description="Simple description",
         scoring_system="binary",
@@ -157,7 +156,7 @@ def test_format_criterion_without_include_review():
 
 def test_format_criterion_with_include_review():
     """Test criterion formatting when review is included."""
-    criterion = CriterionConfig(
+    criterion = CriterionDefinition(
         title="Review Criterion",
         description="Review description", 
         scoring_system="five",

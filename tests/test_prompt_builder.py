@@ -3,9 +3,8 @@ from __future__ import annotations
 import json
 import re
 
+from jira_analyzer.analyzer.core.config import AnalysisConfig, CriterionDefinition
 from jira_analyzer.analyzer.core.llm.prompt_builder import (
-    AnalysisPromptConfig,
-    CriterionConfig,
     build_structured_prompt,
 )
 from jira_analyzer.app.streamlit import (
@@ -189,23 +188,23 @@ def test_build_results_table_adds_criterion_columns():
 
 
 def test_structured_prompt_contains_parseable_schema_for_mixed_criteria():
-    config = AnalysisPromptConfig(
+    config = AnalysisConfig(
         system_prompt="system",
         general_prompt="general",
         criteria=[
-            CriterionConfig(
+            CriterionDefinition(
                 title="Binary criterion",
                 description="Check yes or no.",
                 scoring_system="binary",
                 include_review=False,
             ),
-            CriterionConfig(
+            CriterionDefinition(
                 title="Percent criterion",
                 description="Check completion percent.",
                 scoring_system="percent",
                 include_review=True,
             ),
-            CriterionConfig(
+            CriterionDefinition(
                 title="Five criterion",
                 description="Check five point score.",
                 scoring_system="five",
@@ -243,21 +242,21 @@ def test_structured_prompt_contains_parseable_schema_for_mixed_criteria():
 
 
 def test_structured_prompt_uses_unique_keys_for_cyrillic_criteria():
-    config = AnalysisPromptConfig(
+    config = AnalysisConfig(
         system_prompt="system",
         general_prompt="general",
         criteria=[
-            CriterionConfig(
+            CriterionDefinition(
                 title="Полнота",
                 description="Первый критерий.",
                 scoring_system="binary",
             ),
-            CriterionConfig(
+            CriterionDefinition(
                 title="Измеримость",
                 description="Второй критерий.",
                 scoring_system="percent",
             ),
-            CriterionConfig(
+            CriterionDefinition(
                 title="Соответствие типу",
                 description="Третий критерий.",
                 scoring_system="five",

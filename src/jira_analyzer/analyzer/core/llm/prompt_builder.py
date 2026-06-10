@@ -1,33 +1,19 @@
 import json
 import re
-from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Literal, TextIO
+from typing import TextIO
 
-ScoringSystem = Literal["binary", "percent", "five"]
+from jira_analyzer.analyzer.core.config import (
+    AnalysisConfig,
+    CriterionDefinition,
+    ScoringSystem,
+)
 
 # Template loading paths
 _PACKAGE_DIR = Path(__file__).parent.parent.parent.parent.parent.parent
 _TEMPLATES_DIR = _PACKAGE_DIR / "resources" / "prompts"
 _DEFAULT_CONFIG_PATH = _TEMPLATES_DIR / "default" / "criteria-config.json"
 _INSTRUCTIONS_PATH = _TEMPLATES_DIR / "default" / "instructions.json"
-
-
-@dataclass
-class CriterionConfig:
-    title: str
-    description: str
-    scoring_system: ScoringSystem = "percent"
-    include_review: bool = False
-    key: str | None = None
-
-
-@dataclass
-class AnalysisPromptConfig:
-    system_prompt: str
-    general_prompt: str
-    criteria: list[CriterionConfig] = field(default_factory=list)
-    include_overall_conclusion: bool = True
 
 
 # Template loading functions
@@ -41,15 +27,20 @@ def _load_template(relative_path: str) -> str:
     return template_path.read_text(encoding="utf-8").strip()
 
 
-def _load_criteria_config() -> list[CriterionConfig]:
+def _load_criteria_config() -> list[CriterionDefinition]:
     """Load default criteria configuration from JSON file."""
     if not _DEFAULT_CONFIG_PATH.exists():
         raise FileNotFoundError(f"Criteria configuration file not found: {_DEFAULT_CONFIG_PATH}")
     
     try:
         with open(_DEFAULT_CONFIG_PATH, encoding="utf-8") as f:
-            criteria_data = json.load(f)
-        return [CriterionConfig(**criterion) for criterion in criteria_data]
+            data = json.load(f)
+        # Support both the legacy bare-array format and the unified object format
+        if isinstance(data, dict):
+            criteria_data = data.get("criteria", [])
+        else:
+            criteria_data = data
+        return [CriterionDefinition(**criterion) for criterion in criteria_data]
     except (json.JSONDecodeError, TypeError, ValueError) as e:
         raise ValueError(f"Invalid criteria configuration file: {e}") from e
 
@@ -106,7 +97,7 @@ def build_prompt_from_template(
 def build_structured_prompt(
     element_type: str,
     description: str,
-    config: AnalysisPromptConfig,
+    config: AnalysisConfig,
 ) -> str:
     criteria = [
         criterion
@@ -140,11 +131,11 @@ def build_structured_prompt(
     return prompt
 
 
-def get_default_prompt_config() -> AnalysisPromptConfig:
-    return AnalysisPromptConfig(
+def get_default_prompt_config() -> AnalysisConfig:
+    return AnalysisConfig(
         system_prompt=DEFAULT_SYSTEM_PROMPT,
         general_prompt=DEFAULT_GENERAL_PROMPT,
-        criteria=[CriterionConfig(**criterion.__dict__) for criterion in DEFAULT_CRITERIA],
+        criteria=[CriterionDefinition(**criterion.__dict__) for criterion in DEFAULT_CRITERIA],
         include_overall_conclusion=True,
     )
 
@@ -159,7 +150,7 @@ def build_prompt(element_type: str, description: str, prompt_file: TextIO) -> st
     return build_prompt_from_template(element_type, description, prompt_file.read())
 
 
-def criterion_key(criterion: CriterionConfig) -> str:
+def criterion_key(criterion: CriterionDefinition) -> str:
     if criterion.key:
         return criterion.key
     key = re.sub(r"[^a-zA-Z0-9]+", "_", criterion.title.strip().lower())
@@ -167,7 +158,7 @@ def criterion_key(criterion: CriterionConfig) -> str:
     return key or "criterion"
 
 
-def _criterion_key_map(criteria: list[CriterionConfig]) -> list[str]:
+def _criterion_key_map(criteria: list[CriterionDefinition]) -> list[str]:
     keys: list[str] = []
     used: set[str] = set()
     for index, criterion in enumerate(criteria, start=1):
@@ -187,7 +178,7 @@ def _criterion_key_map(criteria: list[CriterionConfig]) -> list[str]:
     return keys
 
 
-def _format_criterion(index: int, criterion: CriterionConfig, key: str) -> str:
+def _format_criterion(index: int, criterion: CriterionDefinition, key: str) -> str:
     scoring_instruction_text = _scoring_instruction(criterion.scoring_system)
     review_instruction = (
         _REVIEW_INSTRUCTIONS["include"]
@@ -208,7 +199,7 @@ def _format_criterion(index: int, criterion: CriterionConfig, key: str) -> str:
 
 
 def _build_json_schema_text(
-    criteria: list[CriterionConfig],
+    criteria: list[CriterionDefinition],
     include_overall_conclusion: bool,
     criterion_keys: list[str] | None = None,
 ) -> str:

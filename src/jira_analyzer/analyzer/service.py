@@ -8,8 +8,8 @@ import asyncio
 
 from jira_analyzer.analyzer.core.llm.adapter import SyncToAsyncLLMAdapter
 from jira_analyzer.analyzer.core.llm.client import LLMClient
+from jira_analyzer.analyzer.core.config import AnalysisConfig
 from jira_analyzer.analyzer.core.llm.prompt_builder import (
-    AnalysisPromptConfig,
     build_prompt_from_template,
     build_structured_prompt,
     get_default_prompt_config,
@@ -36,7 +36,7 @@ class AnalysisService:
     def __init__(
         self,
         prompt_template: str | None = None,
-        prompt_config: AnalysisPromptConfig | None = None,
+        prompt_config: AnalysisConfig | None = None,
         worker_count: int = 1,
         llm_max_workers: int | None = None,
         llm_provider: LLMProvider | None = None,
@@ -87,37 +87,26 @@ class AnalysisService:
         if run_name is None:
             run_name = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         
-        # Convert criteria to dict format for storage
-        criteria_list = [
-            {
-                "title": criterion.title,
-                "description": criterion.description,
-                "scoring_system": criterion.scoring_system,
-                "include_review": criterion.include_review,
-                "key": criterion.key,
-            }
-            for criterion in self.prompt_config.criteria
-        ]
-        
         # Derive reasoning_enabled from reasoning_effort for DB storage
         db_reasoning_enabled = self.reasoning_effort != "none"
         
-        # Sort criteria deterministically so hash is stable
-        sorted_criteria = sorted(criteria_list, key=lambda c: (c.get("key", ""), c.get("title", "")))
-        
-        # Build full config dict
-        config_dict = {
-            "system_prompt": self.prompt_config.system_prompt,
-            "general_prompt": self.prompt_config.general_prompt,
-            "include_overall_conclusion": self.prompt_config.include_overall_conclusion,
-            "split_by_criterion": self.split_by_criterion,
-            "reasoning_enabled": db_reasoning_enabled,
-            "reasoning_effort": self.reasoning_effort,
-            "criteria": sorted_criteria,
-        }
+        # Build typed config — sorts criteria deterministically for stable hash
+        sorted_criteria = sorted(
+            self.prompt_config.criteria,
+            key=lambda c: (c.key or "", c.title or ""),
+        )
+        analysis_config = AnalysisConfig(
+            system_prompt=self.prompt_config.system_prompt,
+            general_prompt=self.prompt_config.general_prompt,
+            include_overall_conclusion=self.prompt_config.include_overall_conclusion,
+            split_by_criterion=self.split_by_criterion,
+            reasoning_enabled=db_reasoning_enabled,
+            reasoning_effort=self.reasoning_effort,
+            criteria=sorted_criteria,
+        )
         
         # Serialize to JSON deterministically
-        config_json = json.dumps(config_dict, sort_keys=True, ensure_ascii=False)
+        config_json = analysis_config.to_json(sort_keys=True)
         
         # Compute hash from the same serialization (ensures consistency)
         config_hash = hashlib.sha256(config_json.encode("utf-8")).hexdigest()
@@ -138,6 +127,12 @@ class AnalysisService:
         )
         
         # Save criteria (if the run uses config-based storage, this is a no-op)
+        criteria_list = [
+            {"title": c.title, "description": c.description,
+             "scoring_system": c.scoring_system, "include_review": c.include_review,
+             "key": c.key}
+            for c in sorted_criteria
+        ]
         self.repo.save_criteria(run_id, criteria_list)
         
         # Update the service to use this run
@@ -381,7 +376,7 @@ class AnalysisService:
             
         criteria_requests: list[tuple[str, str | None]] = []
         for criterion in self.prompt_config.criteria:
-            single_prompt_config = AnalysisPromptConfig(
+            single_prompt_config = AnalysisConfig(
                 system_prompt=self.prompt_config.system_prompt,
                 general_prompt=self.prompt_config.general_prompt,
                 criteria=[criterion],

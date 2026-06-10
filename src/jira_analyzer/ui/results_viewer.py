@@ -1,11 +1,11 @@
 """Results Viewer for browsing SQLite analysis results."""
 
-import json
 from typing import Any, Dict, List, Callable
 
 import pandas as pd
 import streamlit as st
 
+from jira_analyzer.analyzer.core.config import AnalysisConfig, CriterionDefinition
 from jira_analyzer.storage import SqliteAnalysisResultRepository
 
 
@@ -392,28 +392,29 @@ class ResultsViewer:
                                     st.write(f"*{self.t('includes_review_label')}*")
                                 st.divider()
 
-                    # Export button
-                    export_data = {
-                        "version": 1,
-                        "run_name": analysis_run.get("run_name", f"Run {run_id}"),
-                        "created_at": analysis_run.get("created_at", ""),
-                        "system_prompt": analysis_run.get("system_prompt", ""),
-                        "general_prompt": analysis_run.get("general_prompt", ""),
-                        "include_overall_conclusion": analysis_run.get("include_overall_conclusion", True),
-                        "split_by_criterion": analysis_run.get("split_by_criterion", False),
-                        "reasoning_enabled": analysis_run.get("reasoning_enabled", False),
-                        "reasoning_effort": analysis_run.get("reasoning_effort", "high"),
-                        "criteria": [
-                            {
-                                "title": c.get("title", ""),
-                                "description": c.get("description", ""),
-                                "scoring_system": c.get("scoring_system", "percent"),
-                                "include_review": bool(c.get("include_review", False)),
-                            }
+                    # Export button — use typed config dataclass
+                    export_data = AnalysisConfig(
+                        version=1,
+                        run_name=analysis_run.get("run_name", f"Run {run_id}"),
+                        created_at=analysis_run.get("created_at", ""),
+                        system_prompt=analysis_run.get("system_prompt", ""),
+                        general_prompt=analysis_run.get("general_prompt", ""),
+                        include_overall_conclusion=analysis_run.get("include_overall_conclusion", True),
+                        split_by_criterion=analysis_run.get("split_by_criterion", False),
+                        reasoning_enabled=analysis_run.get("reasoning_enabled", False),
+                        reasoning_effort=analysis_run.get("reasoning_effort", "high"),
+                        criteria=[
+                            CriterionDefinition(
+                                title=c.get("title", ""),
+                                description=c.get("description", ""),
+                                scoring_system=c.get("scoring_system", "percent"),
+                                include_review=bool(c.get("include_review", False)),
+                                key=c.get("key", ""),
+                            )
                             for c in (criteria or [])
                         ],
-                    }
-                    export_json = json.dumps(export_data, ensure_ascii=False, indent=2)
+                    )
+                    export_json = export_data.to_json(indent=2)
                     st.download_button(
                         label=self.t("export_config"),
                         data=export_json,
@@ -476,7 +477,7 @@ class ResultsViewer:
         
         try:
             criteria = self.repository.get_criteria(run_id)
-            return {c.get("criterion_key", c.get("title")): c for c in criteria}
+            return {c.get("key", c.get("title")): c for c in criteria}
         except Exception:
             return {}
 
