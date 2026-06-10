@@ -15,17 +15,25 @@ LLM_FAKE_SCENARIO = os.getenv("LLM_FAKE_SCENARIO", "default")
 # LLM debugging settings
 LOG_LLM_PROMPTS = os.getenv("LOG_LLM_PROMPTS", "false").lower() == "true"
 
-# LLM reasoning mode settings (for models like DeepSeek)
-LLM_REASONING_ENABLED = os.getenv("LLM_REASONING_ENABLED", "false").lower() == "true"
-LLM_REASONING_EFFORT = os.getenv("LLM_REASONING_EFFORT", "high")  # Options: "high", "max"
+# LLM reasoning effort — single user-facing knob for model thinking/reasoning.
+# Compatible with ALL OpenAI-compatible APIs, including Ollama, vLLM, api.openai.com, etc.
+# Values:
+#   "none" (default) — nothink mode. Sends `think: false` in extra_body (Ollama's native
+#     nothink parameter). Harmlessly ignored by all other OpenAI-compatible APIs.
+#   "low"            — send reasoning_effort="low" (OpenAI o-series native parameter).
+#   "medium"         — send reasoning_effort="medium".
+#   "high"           — send reasoning_effort="high".
+# When set to "low"/"medium"/"high", the standard `reasoning_effort` parameter is sent.
+# Models that don't support it (GPT-4o, Qwen, Llama, etc.) silently ignore it.
+# Only OpenAI o-series and similar reasoning models act on it.
+LLM_REASONING_EFFORT = os.getenv("LLM_REASONING_EFFORT", "none").lower()
 
 
-def resolve_llm_config(reasoning_enabled: bool | None = None, reasoning_effort: str | None = None) -> dict:
+def resolve_llm_config(reasoning_effort: str | None = None) -> dict:
     """Resolve LLM configuration from environment variables.
     
     Args:
-        reasoning_enabled: Optional override for reasoning mode (from UI)
-        reasoning_effort: Optional override for reasoning effort (from UI)
+        reasoning_effort: Optional override for reasoning effort (from UI) — "none", "low", "medium", "high"
     
     Returns provider configuration dictionary that can be used with ProviderFactory.
     """
@@ -37,17 +45,16 @@ def resolve_llm_config(reasoning_enabled: bool | None = None, reasoning_effort: 
         if not LLM_API_KEY:
             raise ValueError("LLM_API_KEY not set in environment for openai-compatible provider")
         
-        # Use UI overrides if provided, otherwise use environment variables
-        final_reasoning_enabled = reasoning_enabled if reasoning_enabled is not None else LLM_REASONING_ENABLED
-        final_reasoning_effort = reasoning_effort if reasoning_effort is not None else str(LLM_REASONING_EFFORT)
+        final_reasoning_effort = reasoning_effort if reasoning_effort is not None else LLM_REASONING_EFFORT
+        if final_reasoning_effort not in ("none", "low", "medium", "high"):
+            final_reasoning_effort = "none"
         
         return {
             "provider_type": provider_type,
             "api_key": str(LLM_API_KEY),
             "base_url": str(LLM_BASE_URL),
             "model": str(LLM_MODEL),
-            "reasoning_enabled": final_reasoning_enabled,
-            "reasoning_effort": final_reasoning_effort
+            "reasoning_effort": final_reasoning_effort,
         }
     
     elif provider_type == "fake":
