@@ -72,42 +72,48 @@ analysis_runs    (1) ──→ (many) analysis_results    via run_id
 
 ## `config_json` structure
 
-The `config_json` column in `analysis_configs` stores the full analysis configuration as a JSON object:
+The `config_json` column in `analysis_configs` stores the full analysis configuration as a JSON object matching the `AnalysisConfig` dataclass:
 
 ```json
 {
-  "system_prompt": "You are a code reviewer.",
-  "general_prompt": "Analyze the following.",
-  "include_overall_conclusion": true,
-  "split_by_criterion": false,
-  "reasoning_enabled": true,
-  "reasoning_effort": "high",
   "criteria": [
     {
-      "title": "Quality",
       "description": "Code quality",
-      "scoring_system": "percent",
       "include_review": false,
-      "key": "quality"
+      "key": "quality",
+      "scoring_system": "percent",
+      "title": "Quality"
     },
     {
-      "title": "Security",
       "description": "Security review",
-      "scoring_system": "binary",
       "include_review": true,
-      "key": "security"
+      "key": "security",
+      "scoring_system": "binary",
+      "title": "Security"
     }
-  ]
+  ],
+  "default_scoring_system": "percent",
+  "general_prompt": "Analyze the following.",
+  "include_overall_conclusion": true,
+  "reasoning_enabled": true,
+  "reasoning_effort": "high",
+  "split_by_criterion": false,
+  "system_prompt": "You are a code reviewer.",
+  "version": 1
 }
 ```
+
+> Fields are alphabetically sorted (`sort_keys=True`) to produce a deterministic hash for deduplication.
 
 ### Top‑level fields
 
 | Field | Type | Description |
 |---|---|---|
+| `version` | `integer` | Schema version (currently `1`) |
 | `system_prompt` | `string` | System-level instruction for the LLM |
 | `general_prompt` | `string` | General instruction prepended to every analysis prompt |
 | `include_overall_conclusion` | `boolean` | Whether to request an overall conclusion in the response |
+| `default_scoring_system` | `string` | Default scoring for new criteria: `"percent"`, `"binary"`, or `"five"` |
 | `split_by_criterion` | `boolean` | If `true`, each criterion is sent as a separate LLM request |
 | `reasoning_enabled` | `boolean` | Whether reasoning/thinking tokens are enabled |
 | `reasoning_effort` | `string` | `"none"`, `"low"`, `"medium"`, or `"high"` |
