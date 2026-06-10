@@ -1,7 +1,5 @@
 """Tests for the provider adapter that bridges sync and async interfaces."""
 
-from __future__ import annotations
-
 import asyncio
 import pytest
 

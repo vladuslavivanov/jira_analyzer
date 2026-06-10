@@ -171,18 +171,20 @@ Placeholders use curly brace syntax: `{variable_name}`.
 
 ## Criteria Configuration
 
-### JSON Structure (`criteria-config.json`)
+### File Structure (`criteria-config.json`)
 
 ```json
-[
-  {
-    "title": "Completeness and specificity",
-    "description": "Check whether the issue contains concrete names, links, versions, API signatures, expected behavior, and enough context to act on it.",
-    "scoring_system": "percent",
-    "include_review": true,
-    "key": "completeness"
-  }
-]
+{
+  "version": 1,
+  "criteria": [
+    {
+      "title": "Completeness and specificity",
+      "description": "Check whether the issue contains concrete names, links, versions, API signatures, expected behavior, and enough context to act on it.",
+      "scoring_system": "percent",
+      "include_review": true
+    }
+  ]
+}
 ```
 
 ### Criterion Properties
@@ -193,7 +195,14 @@ Placeholders use curly brace syntax: `{variable_name}`.
 | `description` | string | Yes | Detailed evaluation guidance |
 | `scoring_system` | enum | Yes | `binary`, `percent`, or `five` |
 | `include_review` | boolean | No | Whether to include review field (default: false) |
-| `key` | string | No | Override automatic key generation |
+| `key` | string | No | Override automatic key generation. If omitted, derived from `title`. |
+
+### Root Properties
+
+| Property | Type | Required | Description |
+|----------|------|----------|-------------|
+| `version` | integer | Yes | Schema version (currently `1`) |
+| `criteria` | array | Yes | List of criterion objects |
 
 ### Scoring Systems
 
@@ -202,6 +211,61 @@ Placeholders use curly brace syntax: `{variable_name}`.
 | `binary` | 0-1 | Yes/no criteria, compliance checks |
 | `percent` | 0-100 | Quality metrics, completeness scores |
 | `five` | 0-5 | Likert-style evaluations, qualitative ratings |
+
+## Analysis Config Export Format
+
+When you export an analysis configuration (from the prompt editor or the results viewer), it uses the full `AnalysisConfig` schema. This is the same format accepted by the import function, so exported configs can be round-tripped.
+
+### Full Schema
+
+```json
+{
+  "version": 1,
+  "system_prompt": "You are a code reviewer...",
+  "general_prompt": "Analyze the following issue...",
+  "include_overall_conclusion": true,
+  "default_scoring_system": "percent",
+  "criteria": [
+    {
+      "title": "Completeness and specificity",
+      "description": "Check whether the issue contains concrete names, links...",
+      "scoring_system": "percent",
+      "include_review": true,
+      "key": ""
+    }
+  ]
+}
+```
+
+### Root Properties
+
+| Property | Type | Required | Description |
+|----------|------|----------|-------------|
+| `version` | integer | Yes | Schema version (`1`) |
+| `system_prompt` | string | Yes | System prompt sent to the LLM |
+| `general_prompt` | string | Yes | General analysis instruction |
+| `include_overall_conclusion` | boolean | Yes | Whether to include `overall_conclusion` in results |
+| `default_scoring_system` | enum | Yes | Default scoring for new criteria: `binary`, `percent`, or `five` |
+| `criteria` | array | Yes | List of criterion objects (see [Criterion Properties](#criterion-properties)) |
+
+### Run-Specific Metadata (Optional)
+
+When exporting from the results viewer, these additional fields are included and preserved. They are silently ignored on import.
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `run_name` | string | Name of the analysis run |
+| `created_at` | string | ISO timestamp of when the run was created |
+| `split_by_criterion` | boolean | Whether criteria were evaluated in separate LLM calls |
+| `reasoning_enabled` | boolean | Whether LLM reasoning/thinking was enabled |
+| `reasoning_effort` | string | Reasoning effort level (`none`, `low`, `medium`, `high`) |
+
+### Import Behaviour
+
+- Unknown fields are silently ignored
+- Missing `criteria` defaults to an empty list
+- `default_scoring_system` accepts both canonical values (`percent`, `binary`, `five`) and display labels (`0-100%`, `0/1`, `0-5`)
+- `reasoning_enabled` and the legacy `reasoning_mode` field are both accepted
 
 ## Modifying Prompts Without Code Changes
 
@@ -239,21 +303,24 @@ Without restarting the application - changes are loaded dynamically.
 1. Edit `resources/prompts/default/criteria-config.json`:
 
 ```json
-[
-  {
-    "title": "Completeness and specificity",
-    "description": "Check whether the issue contains concrete names, links, versions, API signatures, expected behavior, and enough context to act on it.",
-    "scoring_system": "percent",
-    "include_review": true
-  },
-  {
-    "title": "Security considerations",
-    "description": "Evaluate whether the issue addresses security implications, including authentication, authorization, data protection, and compliance requirements.",
-    "scoring_system": "five",
-    "include_review": true,
-    "key": "security"
-  }
-]
+{
+  "version": 1,
+  "criteria": [
+    {
+      "title": "Completeness and specificity",
+      "description": "Check whether the issue contains concrete names, links, versions, API signatures, expected behavior, and enough context to act on it.",
+      "scoring_system": "percent",
+      "include_review": true
+    },
+    {
+      "title": "Security considerations",
+      "description": "Evaluate whether the issue addresses security implications, including authentication, authorization, data protection, and compliance requirements.",
+      "scoring_system": "five",
+      "include_review": true,
+      "key": "security"
+    }
+  ]
+}
 ```
 
 2. Restart the application - the new criterion will automatically appear in analysis.
@@ -301,20 +368,23 @@ Analyze the mobile app issue description. Evaluate user experience consideration
 
 2. `criteria-config.json`:
 ```json
-[
-  {
-    "title": "Mobile UX Compliance",
-    "description": "Check whether the issue considers mobile-specific UX patterns, touch targets, navigation patterns, and mobile design guidelines.",
-    "scoring_system": "five",
-    "include_review": true
-  },
-  {
-    "title": "Platform Specificity",
-    "description": "Evaluate whether the issue specifies target mobile platforms (iOS/Android) and platform-specific requirements or constraints.",
-    "scoring_system": "percent",
-    "include_review": false
-  }
-]
+{
+  "version": 1,
+  "criteria": [
+    {
+      "title": "Mobile UX Compliance",
+      "description": "Check whether the issue considers mobile-specific UX patterns, touch targets, navigation patterns, and mobile design guidelines.",
+      "scoring_system": "five",
+      "include_review": true
+    },
+    {
+      "title": "Platform Specificity",
+      "description": "Evaluate whether the issue specifies target mobile platforms (iOS/Android) and platform-specific requirements or constraints.",
+      "scoring_system": "percent",
+      "include_review": false
+    }
+  ]
+}
 ```
 
 ### Example 2: Data Quality Focus
@@ -330,20 +400,23 @@ You are a data quality specialist focused on completeness, accuracy, consistency
 
 2. `criteria-config.json`:
 ```json
-[
-  {
-    "title": "Data Completeness",
-    "description": "Check whether the issue specifies all required data fields, data structures, input sources, and output formats.",
-    "scoring_system": "percent",
-    "include_review": true
-  },
-  {
-    "title": "Validation Requirements",
-    "description": "Evaluate whether data validation rules, error handling, and data quality checks are clearly defined.",
-    "scoring_system": "percent",
-    "include_review": true
-  }
-]
+{
+  "version": 1,
+  "criteria": [
+    {
+      "title": "Data Completeness",
+      "description": "Check whether the issue specifies all required data fields, data structures, input sources, and output formats.",
+      "scoring_system": "percent",
+      "include_review": true
+    },
+    {
+      "title": "Validation Requirements",
+      "description": "Evaluate whether data validation rules, error handling, and data quality checks are clearly defined.",
+      "scoring_system": "percent",
+      "include_review": true
+    }
+  ]
+}
 ```
 
 ### Example 3 compliance Focus
@@ -364,20 +437,23 @@ Analyze the compliance issue description. Evaluate regulatory considerations inc
 
 2. `criteria-config.json`:
 ```json
-[
-  {
-    "title": "Regulatory Coverage",
-    "description": "Check whether the issue identifies applicable regulations, standards, and compliance frameworks.",
-    "scoring_system": "binary",
-    "include_review": true
-  },
-  {
-    "title": "Documentation Requirements",
-    "description": "Evaluate whether compliance documentation, evidence collection, and audit requirements are specified.",
-    "scoring_system": "percent",
-    "include_review": false
-  }
-]
+{
+  "version": 1,
+  "criteria": [
+    {
+      "title": "Regulatory Coverage",
+      "description": "Check whether the issue identifies applicable regulations, standards, and compliance frameworks.",
+      "scoring_system": "binary",
+      "include_review": true
+    },
+    {
+      "title": "Documentation Requirements",
+      "description": "Evaluate whether compliance documentation, evidence collection, and audit requirements are specified.",
+      "scoring_system": "percent",
+      "include_review": false
+    }
+  ]
+}
 ```
 
 ## Step-by-Step Customization Guide

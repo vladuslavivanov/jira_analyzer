@@ -1,7 +1,5 @@
 """Tests for parallel execution using new provider architecture."""
 
-from __future__ import annotations
-
 import time
 
 

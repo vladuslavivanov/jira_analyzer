@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import json
 import sqlite3
 from datetime import datetime, timedelta, timezone
@@ -47,11 +45,13 @@ class SqliteAnalysisResultRepository(AnalysisResultRepository):
                 """
             )
             
-            # Create analysis_results table with run_id reference
+            # Create analysis_results table with composite (task_id, run_id) uniqueness
+            # to allow the same task to be analyzed in different runs.
             connection.execute(
                 """
                 CREATE TABLE IF NOT EXISTS analysis_results (
-                    task_id TEXT PRIMARY KEY,
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    task_id TEXT NOT NULL,
                     run_id INTEGER,
                     title TEXT,
                     description TEXT,
@@ -64,10 +64,41 @@ class SqliteAnalysisResultRepository(AnalysisResultRepository):
                     recommendations TEXT,
                     raw_response TEXT,
                     analyzed_at TEXT,
-                FOREIGN KEY (run_id) REFERENCES analysis_runs(run_id)
+                    UNIQUE(task_id, run_id),
+                    FOREIGN KEY (run_id) REFERENCES analysis_runs(run_id)
                 )
                 """
             )
+            
+            # Check if table was just created (no 'id' column in old schema)
+            cursor = connection.execute("PRAGMA table_info(analysis_results)")
+            columns = [row[1] for row in cursor.fetchall()]
+            # If the old schema is present (task_id is PK, no 'id' column), recreate
+            if "id" not in columns:
+                # Drop old table and recreate with composite key
+                connection.execute("DROP TABLE IF EXISTS analysis_results")
+                connection.execute(
+                    """
+                    CREATE TABLE analysis_results (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        task_id TEXT NOT NULL,
+                        run_id INTEGER,
+                        title TEXT,
+                        description TEXT,
+                        status TEXT,
+                        assignee TEXT,
+                        created_at TEXT,
+                        updated_at TEXT,
+                        state TEXT DEFAULT 'PENDING',
+                        summary TEXT,
+                        recommendations TEXT,
+                        raw_response TEXT,
+                        analyzed_at TEXT,
+                        UNIQUE(task_id, run_id),
+                        FOREIGN KEY (run_id) REFERENCES analysis_runs(run_id)
+                    )
+                    """
+                )
             
             # Migrate existing databases: add config_id column if missing
             cursor = connection.execute("PRAGMA table_info(analysis_runs)")
@@ -86,6 +117,12 @@ class SqliteAnalysisResultRepository(AnalysisResultRepository):
             )
             connection.execute(
                 """
+                CREATE INDEX IF NOT EXISTS idx_analysis_results_task_id
+                ON analysis_results(task_id)
+                """
+            )
+            connection.execute(
+                """
                 CREATE INDEX IF NOT EXISTS idx_analysis_configs_hash
                 ON analysis_configs(config_hash)
                 """
@@ -98,9 +135,21 @@ class SqliteAnalysisResultRepository(AnalysisResultRepository):
         with sqlite3.connect(self.database_path) as conn:
             conn.execute(
                 """
-                INSERT OR REPLACE INTO analysis_results 
+                INSERT INTO analysis_results
                 (task_id, run_id, title, description, status, assignee, created_at, updated_at, state)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'PENDING')
+                ON CONFLICT(task_id, run_id) DO UPDATE SET
+                    title = excluded.title,
+                    description = excluded.description,
+                    status = excluded.status,
+                    assignee = excluded.assignee,
+                    created_at = excluded.created_at,
+                    updated_at = excluded.updated_at,
+                    state = 'PENDING',
+                    summary = NULL,
+                    recommendations = NULL,
+                    raw_response = NULL,
+                    analyzed_at = NULL
                 """,
                 (
                     task_id,
@@ -115,17 +164,29 @@ class SqliteAnalysisResultRepository(AnalysisResultRepository):
             )
             conn.commit()
 
-    def update_processing(self, task_id: str) -> None:
+    def update_processing(self, task_id: str, run_id: int | None = None) -> None:
         """Update the state to processing for a task."""
         now = datetime.now(timezone(timedelta(hours=3))).isoformat()
         with sqlite3.connect(self.database_path) as conn:
-            conn.execute(
-                "UPDATE analysis_results SET state = 'PROCESSING', analyzed_at = ? WHERE task_id = ?",
-                (now, task_id),
-            )
+            if run_id is not None:
+                conn.execute(
+                    "UPDATE analysis_results SET state = 'PROCESSING', analyzed_at = ? WHERE task_id = ? AND run_id = ?",
+                    (now, task_id, run_id),
+                )
+            else:
+                # Update the latest result for this task
+                conn.execute(
+                    """
+                    UPDATE analysis_results SET state = 'PROCESSING', analyzed_at = ?
+                    WHERE task_id = ? AND run_id = (
+                        SELECT MAX(run_id) FROM analysis_results WHERE task_id = ?
+                    )
+                    """,
+                    (now, task_id, task_id),
+                )
             conn.commit()
 
-    def save_result(self, task_id: str, result: Dict[str, Any]) -> None:
+    def save_result(self, task_id: str, result: Dict[str, Any], run_id: int | None = None) -> None:
         """Save the analysis result for a task."""
         now = datetime.now(timezone(timedelta(hours=3))).isoformat()
 
@@ -142,54 +203,106 @@ class SqliteAnalysisResultRepository(AnalysisResultRepository):
         raw_response = json.dumps(result, ensure_ascii=False)
 
         with sqlite3.connect(self.database_path) as conn:
-            conn.execute(
-                """
-                UPDATE analysis_results 
-                SET state = 'COMPLETED',
-                    summary = ?,
-                    recommendations = ?,
-                    raw_response = ?,
-                    analyzed_at = ?
-                WHERE task_id = ?
-                """,
-                (summary, recommendations, raw_response, now, task_id),
-            )
+            if run_id is not None:
+                conn.execute(
+                    """
+                    UPDATE analysis_results 
+                    SET state = 'COMPLETED',
+                        summary = ?,
+                        recommendations = ?,
+                        raw_response = ?,
+                        analyzed_at = ?
+                    WHERE task_id = ? AND run_id = ?
+                    """,
+                    (summary, recommendations, raw_response, now, task_id, run_id),
+                )
+            else:
+                conn.execute(
+                    """
+                    UPDATE analysis_results 
+                    SET state = 'COMPLETED',
+                        summary = ?,
+                        recommendations = ?,
+                        raw_response = ?,
+                        analyzed_at = ?
+                    WHERE task_id = ? AND run_id = (
+                        SELECT MAX(run_id) FROM analysis_results WHERE task_id = ?
+                    )
+                    """,
+                    (summary, recommendations, raw_response, now, task_id, task_id),
+                )
             conn.commit()
 
-    def save_failed(self, task_id: str, error: str) -> None:
+    def save_failed(self, task_id: str, error: str, run_id: int | None = None) -> None:
         """Save a failed analysis for a task."""
         now = datetime.now(timezone(timedelta(hours=3))).isoformat()
         error_data = json.dumps({"error": error}, ensure_ascii=False)
         with sqlite3.connect(self.database_path) as conn:
-            conn.execute(
-                """
-                UPDATE analysis_results 
-                SET state = 'FAILED',
-                    raw_response = ?,
-                    analyzed_at = ?
-                WHERE task_id = ?
-                """,
-                (error_data, now, task_id),
-            )
+            if run_id is not None:
+                conn.execute(
+                    """
+                    UPDATE analysis_results 
+                    SET state = 'FAILED',
+                        raw_response = ?,
+                        analyzed_at = ?
+                    WHERE task_id = ? AND run_id = ?
+                    """,
+                    (error_data, now, task_id, run_id),
+                )
+            else:
+                conn.execute(
+                    """
+                    UPDATE analysis_results 
+                    SET state = 'FAILED',
+                        raw_response = ?,
+                        analyzed_at = ?
+                    WHERE task_id = ? AND run_id = (
+                        SELECT MAX(run_id) FROM analysis_results WHERE task_id = ?
+                    )
+                    """,
+                    (error_data, now, task_id, task_id),
+                )
             conn.commit()
 
-    def get_state(self, task_id: str) -> Optional[str]:
+    def get_state(self, task_id: str, run_id: int | None = None) -> Optional[str]:
         """Get the current state of a task analysis."""
         with sqlite3.connect(self.database_path) as conn:
-            cursor = conn.execute(
-                "SELECT state FROM analysis_results WHERE task_id = ?",
-                (task_id,),
-            )
+            if run_id is not None:
+                cursor = conn.execute(
+                    "SELECT state FROM analysis_results WHERE task_id = ? AND run_id = ?",
+                    (task_id, run_id),
+                )
+            else:
+                cursor = conn.execute(
+                    """
+                    SELECT state FROM analysis_results
+                    WHERE task_id = ?
+                    ORDER BY run_id DESC
+                    LIMIT 1
+                    """,
+                    (task_id,),
+                )
             row = cursor.fetchone()
             return row[0] if row else None
 
-    def get_result(self, task_id: str) -> Optional[Dict[str, Any]]:
+    def get_result(self, task_id: str, run_id: int | None = None) -> Optional[Dict[str, Any]]:
         """Get the analysis result for a task."""
         with sqlite3.connect(self.database_path) as conn:
-            cursor = conn.execute(
-                "SELECT * FROM analysis_results WHERE task_id = ?",
-                (task_id,),
-            )
+            if run_id is not None:
+                cursor = conn.execute(
+                    "SELECT * FROM analysis_results WHERE task_id = ? AND run_id = ?",
+                    (task_id, run_id),
+                )
+            else:
+                cursor = conn.execute(
+                    """
+                    SELECT * FROM analysis_results
+                    WHERE task_id = ?
+                    ORDER BY run_id DESC
+                    LIMIT 1
+                    """,
+                    (task_id,),
+                )
             row = cursor.fetchone()
             if not row:
                 return None
@@ -262,19 +375,82 @@ class SqliteAnalysisResultRepository(AnalysisResultRepository):
                 results.append(data)
             return results
 
+    def get_latest_results_per_task(self) -> List[Dict[str, Any]]:
+        """Get the most recent analysis result for each task.
+
+        When the same task appears in multiple runs (e.g. analyzed with
+        different configs), only the result from the most recent run
+        (highest run_id) is returned. This is the default "All Runs" view.
+        """
+        with sqlite3.connect(self.database_path) as conn:
+            cursor = conn.execute(
+                """
+                SELECT * FROM analysis_results
+                WHERE id IN (
+                    SELECT MAX(id)
+                    FROM analysis_results
+                    GROUP BY task_id
+                )
+                ORDER BY COALESCE(analyzed_at, created_at) DESC
+                """
+            )
+            rows = cursor.fetchall()
+            results = []
+            for row in rows:
+                columns = [desc[0] for desc in cursor.description]
+                data = dict(zip(columns, row))
+                if data.get("raw_response"):
+                    data["analysis"] = json.loads(data["raw_response"])
+                    del data["raw_response"]
+
+                if (
+                    data.get("summary")
+                    and isinstance(data["summary"], str)
+                    and data["summary"].startswith(("{", "["))
+                ):
+                    try:
+                        data["summary"] = json.loads(data["summary"])
+                    except json.JSONDecodeError:
+                        pass
+                if (
+                    data.get("recommendations")
+                    and isinstance(data["recommendations"], str)
+                    and data["recommendations"].startswith(("{", "["))
+                ):
+                    try:
+                        data["recommendations"] = json.loads(data["recommendations"])
+                    except json.JSONDecodeError:
+                        pass
+
+                data["task_id"] = data["task_id"]
+                results.append(data)
+            return results
+
     # Legacy batch methods adapted to new schema
     def save_results(
         self, results: List[Dict[str, Any]], run_name: str | None = None
     ) -> int:
-        """Save a list of analysis results (legacy)."""
+        """Save a list of analysis results (legacy).
+        
+        Creates an analysis run automatically if needed.
+        """
         now = datetime.now(timezone(timedelta(hours=3))).isoformat()
         with sqlite3.connect(self.database_path) as conn:
+            # Create a run for these results
+            if run_name is None:
+                run_name = now[:19]  # YYYY-MM-DD HH:MM:SS
+            cursor = conn.execute(
+                "INSERT INTO analysis_runs (run_name, created_at) VALUES (?, ?)",
+                (run_name, now),
+            )
+            run_id = cursor.lastrowid
+            assert run_id is not None
+
             for res in results:
                 task_id = res.get("key") or res.get("jira_key")
                 if not task_id:
                     continue
 
-                # Extract fields
                 title = res.get("title", res.get("summary", ""))
                 description = res.get("description", res.get("input_description", ""))
                 status = res.get("status", "")
@@ -296,12 +472,25 @@ class SqliteAnalysisResultRepository(AnalysisResultRepository):
 
                 conn.execute(
                     """
-                    INSERT OR REPLACE INTO analysis_results 
-                    (task_id, title, description, status, assignee, created_at, updated_at, state, summary, recommendations, raw_response, analyzed_at)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, 'COMPLETED', ?, ?, ?, ?)
+                    INSERT INTO analysis_results
+                    (task_id, run_id, title, description, status, assignee, created_at, updated_at, state, summary, recommendations, raw_response, analyzed_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'COMPLETED', ?, ?, ?, ?)
+                    ON CONFLICT(task_id, run_id) DO UPDATE SET
+                        title = excluded.title,
+                        description = excluded.description,
+                        status = excluded.status,
+                        assignee = excluded.assignee,
+                        created_at = excluded.created_at,
+                        updated_at = excluded.updated_at,
+                        state = 'COMPLETED',
+                        summary = excluded.summary,
+                        recommendations = excluded.recommendations,
+                        raw_response = excluded.raw_response,
+                        analyzed_at = excluded.analyzed_at
                     """,
                     (
                         task_id,
+                        run_id,
                         title,
                         description,
                         status,
@@ -315,20 +504,21 @@ class SqliteAnalysisResultRepository(AnalysisResultRepository):
                     ),
                 )
             conn.commit()
-        return 1  # Dummy
+        return run_id
 
     def get_results(self, run_id: int) -> List[Dict[str, Any]]:
-        """Retrieve analysis results (legacy, ignores run_id)."""
+        """Retrieve analysis results for a specific run (legacy)."""
         full = self.get_all_results()
-        return [r["analysis"] for r in full if r.get("analysis")]
+        run_results = [r for r in full if r.get("run_id") == run_id]
+        return [r["analysis"] for r in run_results if r.get("analysis")]
 
     def get_latest_results(self) -> List[Dict[str, Any]]:
-        """Retrieve the most recent analysis results (legacy)."""
-        all_results = self.get_all_results()
-        if all_results:
-            all_results.sort(key=lambda x: x.get("analyzed_at", ""), reverse=True)
-            return [r["analysis"] for r in all_results[:50] if r.get("analysis")]
-        return []
+        """Retrieve the most recent analysis results (legacy).
+        
+        Returns the analysis data from get_latest_results_per_task.
+        """
+        latest = self.get_latest_results_per_task()
+        return [r["analysis"] for r in latest if r.get("analysis")]
 
     # Analysis run management methods
 
@@ -365,7 +555,9 @@ class SqliteAnalysisResultRepository(AnalysisResultRepository):
                 (config_hash, config_json, now),
             )
             conn.commit()
-            return cursor.lastrowid
+            row_id = cursor.lastrowid
+            assert row_id is not None
+            return row_id
 
     def create_analysis_run(
         self,
@@ -405,7 +597,9 @@ class SqliteAnalysisResultRepository(AnalysisResultRepository):
                 ),
             )
             conn.commit()
-            return cursor.lastrowid
+            row_id = cursor.lastrowid
+            assert row_id is not None
+            return row_id
 
     def save_criteria(
         self,
@@ -525,7 +719,7 @@ class SqliteAnalysisResultRepository(AnalysisResultRepository):
                         "description": c.get("description", ""),
                         "scoring_system": c.get("scoring_system", "percent"),
                         "include_review": bool(c.get("include_review", False)),
-                        "criterion_key": c.get("key", ""),
+                        "key": c.get("key", ""),
                     }
                     for c in criteria
                 ]

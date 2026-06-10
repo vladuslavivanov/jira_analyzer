@@ -17,6 +17,7 @@ The application uses a **SQLite** database to persist analysis runs, configurati
 
 Indexes:
 - `idx_analysis_results_run_id` on `analysis_results(run_id)` — speeds up lookups of results by run.
+- `idx_analysis_results_task_id` on `analysis_results(task_id)` — speeds up lookups by task across runs.
 
 ### `analysis_configs` — one row per unique configuration
 
@@ -34,8 +35,9 @@ Indexes:
 
 | Column | Type | Description |
 |---|---|---|
-| `task_id` | `TEXT PRIMARY KEY` | Issue key, e.g. `YA-1` |
-| `run_id` | `INTEGER` | Foreign key referencing `analysis_runs(run_id)`. |
+| `id` | `INTEGER PRIMARY KEY AUTOINCREMENT` | Surrogate primary key for row-level operations |
+| `task_id` | `TEXT NOT NULL` | Issue key, e.g. `YA-1` |
+| `run_id` | `INTEGER` | Foreign key referencing `analysis_runs(run_id)`. Together with `task_id` forms a unique constraint — the same task can appear in different runs. |
 | `title` | `TEXT` | Issue title / summary |
 | `description` | `TEXT` | Issue description |
 | `status` | `TEXT` | Jira status (e.g. `In Progress`) |
@@ -47,6 +49,12 @@ Indexes:
 | `recommendations` | `TEXT` | List of recommendations (JSON) |
 | `raw_response` | `TEXT` | Full LLM response (JSON) |
 | `analyzed_at` | `TEXT` | Timestamp when analysis completed |
+
+**Unique constraint:** `UNIQUE(task_id, run_id)` — the same task can be analyzed in multiple runs, producing separate result rows per run.
+
+Indexes:
+- `idx_analysis_results_run_id` on `run_id` — speeds up lookups of results by run.
+- `idx_analysis_results_task_id` on `task_id` — speeds up lookups by task across runs.
 
 ---
 
@@ -64,42 +72,48 @@ analysis_runs    (1) ──→ (many) analysis_results    via run_id
 
 ## `config_json` structure
 
-The `config_json` column in `analysis_configs` stores the full analysis configuration as a JSON object:
+The `config_json` column in `analysis_configs` stores the full analysis configuration as a JSON object matching the `AnalysisConfig` dataclass:
 
 ```json
 {
-  "system_prompt": "You are a code reviewer.",
-  "general_prompt": "Analyze the following.",
-  "include_overall_conclusion": true,
-  "split_by_criterion": false,
-  "reasoning_enabled": true,
-  "reasoning_effort": "high",
   "criteria": [
     {
-      "title": "Quality",
       "description": "Code quality",
-      "scoring_system": "percent",
       "include_review": false,
-      "key": "quality"
+      "key": "quality",
+      "scoring_system": "percent",
+      "title": "Quality"
     },
     {
-      "title": "Security",
       "description": "Security review",
-      "scoring_system": "binary",
       "include_review": true,
-      "key": "security"
+      "key": "security",
+      "scoring_system": "binary",
+      "title": "Security"
     }
-  ]
+  ],
+  "default_scoring_system": "percent",
+  "general_prompt": "Analyze the following.",
+  "include_overall_conclusion": true,
+  "reasoning_enabled": true,
+  "reasoning_effort": "high",
+  "split_by_criterion": false,
+  "system_prompt": "You are a code reviewer.",
+  "version": 1
 }
 ```
+
+> Fields are alphabetically sorted (`sort_keys=True`) to produce a deterministic hash for deduplication.
 
 ### Top‑level fields
 
 | Field | Type | Description |
 |---|---|---|
+| `version` | `integer` | Schema version (currently `1`) |
 | `system_prompt` | `string` | System-level instruction for the LLM |
 | `general_prompt` | `string` | General instruction prepended to every analysis prompt |
 | `include_overall_conclusion` | `boolean` | Whether to request an overall conclusion in the response |
+| `default_scoring_system` | `string` | Default scoring for new criteria: `"percent"`, `"binary"`, or `"five"` |
 | `split_by_criterion` | `boolean` | If `true`, each criterion is sent as a separate LLM request |
 | `reasoning_enabled` | `boolean` | Whether reasoning/thinking tokens are enabled |
 | `reasoning_effort` | `string` | `"none"`, `"low"`, `"medium"`, or `"high"` |
@@ -131,6 +145,26 @@ This means running the same prompts and criteria 10 times produces **1 row** in 
 ---
 
 ## Query patterns (reference)
+
+### Get the latest result per task (default "All Runs" view)
+
+```sql
+SELECT * FROM analysis_results
+WHERE id IN (
+    SELECT MAX(id)
+    FROM analysis_results
+    GROUP BY task_id
+)
+ORDER BY COALESCE(analyzed_at, created_at) DESC;
+```
+
+### Get all results for a specific run
+
+```sql
+SELECT * FROM analysis_results
+WHERE run_id = ?
+ORDER BY COALESCE(analyzed_at, created_at) DESC;
+```
 
 ### Get a run with its merged config data
 
@@ -167,13 +201,23 @@ ORDER BY r.created_at DESC;
 
 ## Migration
 
-The only schema migration performed automatically is adding the `config_id` column to `analysis_runs` if it is missing (for databases created before the config‑based schema was introduced). This is done via:
+Schema migrations are performed automatically inside `_initialize_database()` on every application start.
+
+### `analysis_configs`/`config_id` migration
+
+For databases created before the config‑based schema was introduced, the `config_id` column is added to `analysis_runs`:
 
 ```sql
 ALTER TABLE analysis_runs ADD COLUMN config_id INTEGER;
 ```
 
-The migration runs inside `_initialize_database()` on every application start and is **idempotent** (the `PRAGMA table_info` check prevents duplicate attempts).
+This is **idempotent** (the `PRAGMA table_info` check prevents duplicate attempts).
+
+### `analysis_results` composite key migration
+
+For databases created with the old `task_id TEXT PRIMARY KEY` schema, the `analysis_results` table is dropped and recreated with the new composite-key schema (`id INTEGER PRIMARY KEY AUTOINCREMENT` + `UNIQUE(task_id, run_id)`). The migration is triggered when the `id` column is not found.
+
+Since the old schema could only store one result per task (the last run would overwrite earlier data), no data is lost — the new table starts empty and will be populated by subsequent analysis runs.
 
 ---
 
@@ -182,4 +226,5 @@ The migration runs inside `_initialize_database()` on every application start an
 | Version | Changes |
 |---|---|
 | 1 (original) | `analysis_runs` with inline config columns (`system_prompt`, `general_prompt`, etc.), separate `criteria` table |
-| 2 (current) | `analysis_configs` table added, config columns removed from `analysis_runs`, `criteria` table removed. Config stored as JSON in `analysis_configs.config_json`, deduplicated by SHA-256 hash. |
+| 2 | `analysis_configs` table added, config columns removed from `analysis_runs`, `criteria` table removed. Config stored as JSON in `analysis_configs.config_json`, deduplicated by SHA-256 hash. |
+| **3 (current)** | `analysis_results` changed from `task_id TEXT PRIMARY KEY` to `id INTEGER PRIMARY KEY AUTOINCREMENT` + `UNIQUE(task_id, run_id)`. The same task can now be analyzed in multiple runs with different configurations, with each result preserved independently. The **Results Viewer** defaults to showing the latest result per task ("All Runs") but can be filtered to a specific run to compare across sessions. |

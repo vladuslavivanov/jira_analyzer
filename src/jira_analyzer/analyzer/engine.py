@@ -1,7 +1,7 @@
 from typing import Any, Dict, List, Optional
 
+from jira_analyzer.analyzer.core.config import AnalysisConfig
 from jira_analyzer.analyzer.core.llm.prompt_builder import (
-    AnalysisPromptConfig,
     get_default_prompt_config,
 )
 from jira_analyzer.analyzer.service import AnalysisService
@@ -11,7 +11,7 @@ from jira_analyzer.storage import AnalysisResultRepository
 def run_analysis(
     issues: List[Dict[str, Any]],
     prompt_template: str | None = None,
-    prompt_config: AnalysisPromptConfig | None = None,
+    prompt_config: AnalysisConfig | None = None,
     worker_count: int = 1,
     split_by_criterion: bool = False,
     llm_max_workers: int | None = None,
@@ -35,5 +35,5 @@ def run_analysis(
     return service.analyze_issues(issues)
 
 
-def get_default_analysis_prompt_config() -> AnalysisPromptConfig:
+def get_default_analysis_prompt_config() -> AnalysisConfig:
     return get_default_prompt_config()

@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from abc import ABC, abstractmethod
 from typing import Any, Dict, List, Optional
 
@@ -12,33 +10,83 @@ class AnalysisResultRepository(ABC):
         raise NotImplementedError()
 
     @abstractmethod
-    def update_processing(self, task_id: str) -> None:
-        """Update the state to processing for a task."""
+    def update_processing(self, task_id: str, run_id: int | None = None) -> None:
+        """Update the state to processing for a task.
+
+        Args:
+            task_id: The task ID.
+            run_id: The analysis run ID. If None, updates the latest result
+                    for this task.
+        """
         raise NotImplementedError()
 
     @abstractmethod
-    def save_result(self, task_id: str, result: Dict[str, Any]) -> None:
-        """Save the analysis result for a task."""
+    def save_result(self, task_id: str, result: Dict[str, Any], run_id: int | None = None) -> None:
+        """Save the analysis result for a task.
+
+        Args:
+            task_id: The task ID.
+            result: The analysis result data.
+            run_id: The analysis run ID. If None, saves to the latest run
+                    for this task.
+        """
         raise NotImplementedError()
 
     @abstractmethod
-    def save_failed(self, task_id: str, error: str) -> None:
-        """Save a failed analysis for a task."""
+    def save_failed(self, task_id: str, error: str, run_id: int | None = None) -> None:
+        """Save a failed analysis for a task.
+
+        Args:
+            task_id: The task ID.
+            error: Error description.
+            run_id: The analysis run ID. If None, saves to the latest run
+                    for this task.
+        """
         raise NotImplementedError()
 
     @abstractmethod
-    def get_state(self, task_id: str) -> Optional[str]:
-        """Get the current state of a task analysis."""
+    def get_state(self, task_id: str, run_id: int | None = None) -> Optional[str]:
+        """Get the current state of a task analysis.
+
+        Args:
+            task_id: The task ID.
+            run_id: The analysis run ID. If None, returns the state of the
+                    latest result for this task.
+
+        Returns:
+            The state string or None if not found.
+        """
         raise NotImplementedError()
 
     @abstractmethod
-    def get_result(self, task_id: str) -> Optional[Dict[str, Any]]:
-        """Get the analysis result for a task."""
+    def get_result(self, task_id: str, run_id: int | None = None) -> Optional[Dict[str, Any]]:
+        """Get the analysis result for a task.
+
+        Args:
+            task_id: The task ID.
+            run_id: The analysis run ID. If None, returns the latest result
+                    for this task.
+
+        Returns:
+            The result dict or None if not found.
+        """
         raise NotImplementedError()
 
     @abstractmethod
     def get_all_results(self) -> List[Dict[str, Any]]:
-        """Get all analysis results."""
+        """Get all analysis results (across all runs, without deduplication)."""
+        raise NotImplementedError()
+
+    @abstractmethod
+    def get_latest_results_per_task(self) -> List[Dict[str, Any]]:
+        """Get the most recent analysis result for each task.
+
+        When the same task appears in multiple runs, only the result from
+        the most recent run (highest run_id) is returned.
+
+        Returns:
+            List of result dicts, at most one per task.
+        """
         raise NotImplementedError()
 
     # Analysis run management methods
@@ -99,5 +147,5 @@ class AnalysisResultRepository(ABC):
 
     @abstractmethod
     def get_latest_results(self) -> List[Dict[str, Any]]:
-        """Retrieve the most recent analysis results."""
+        """Retrieve the most recent analysis results (legacy)."""
         raise NotImplementedError()
