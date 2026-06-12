@@ -16,6 +16,9 @@ Jira AI Analyzer is built as a lightweight modular monolith for AI-driven Jira i
 - **AnalysisService**: the central workflow owner that requests tasks, invokes the analyzer, and persists results.
 - **Analyzer**: prepares prompt content from configurable criteria and sends requests to an LLM provider.
 - **LLM providers**: supports `fake` mode for local testing and `openai-compatible` mode for production-style LLM calls.
+  - The `openai-compatible` provider implements automatic retry with exponential backoff for transient errors
+    (rate limits, timeouts, connection drops, 5xx). Non-retryable errors (auth, bad request, permission) are
+    reported immediately with clear, actionable messages.
 - **Jira client / task repository**: fetches and normalizes issues from Jira or local data sources.
 - **Mock Jira service**: optional local Jira-compatible API for offline development.
 
