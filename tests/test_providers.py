@@ -1,7 +1,6 @@
 """Tests for the new provider-agnostic LLM architecture."""
 
 import pytest
-from openai import OpenAIError
 
 from jira_analyzer.providers import (
     BaseLLMProvider,
@@ -102,7 +101,7 @@ def test_openai_provider_requires_parameters():
 
 
 def test_openai_provider_invalid_api_call():
-    """Test OpenAICompatibleProvider fails with invalid credentials."""
+    """Test OpenAICompatibleProvider wraps API errors in RuntimeError."""
     provider = OpenAICompatibleProvider(
         api_key="invalid-key",
         base_url="http://invalid-url.example.com/v1",
@@ -111,7 +110,7 @@ def test_openai_provider_invalid_api_call():
     
     messages = [LLMMessage(role="user", content="Test")]
     
-    with pytest.raises(OpenAIError):
+    with pytest.raises(RuntimeError):
         provider.call_llm(messages)
 
 
