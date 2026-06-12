@@ -127,10 +127,19 @@ Open the UI at `http://localhost:8501`.
 
 ### Retry & Error Handling
 
+#### LLM Provider
+
 The OpenAI-compatible provider automatically retries transient API errors:
 - **Rate limits** (HTTP 429), **timeouts**, **connection drops**, and **server errors** (5xx) are retried up to **3 times** with exponential backoff (1s → 2s → 4s).
 - **Authentication failures**, **bad requests**, and **permission errors** are reported immediately without retry.
 - All errors are wrapped in descriptive, actionable messages and surfaced in the UI.
+
+#### Jira Client
+
+The Jira API client has the same retry policy:
+- **Rate limits** (HTTP 429), **server errors** (5xx), **connection drops**, and **timeouts** are retried up to **3 times** with exponential backoff (1s → 2s → 4s).
+- **Authentication failures** (401), **bad requests** (400), **not found** (404), and **permission errors** (403) are reported immediately without retry.
+- Connection and timeout errors include guidance about checking the server URL and network.
 
 ### Logging
 
