@@ -482,7 +482,7 @@ class Analyzer:
 ## Responsibilities
 
 * queue management,
-* retries,
+* concurrency control (semaphore-based worker limiting),
 * async execution.
 
 ---
@@ -491,8 +491,12 @@ class Analyzer:
 
 ```python
 class LLMClient:
-    async def request(prompt: str) -> str
+    async def send_prompt(prompt: str, system_prompt: str | None = None) -> dict[str, Any]
+    async def send_prompts(requests: list[tuple[str, str | None]]) -> list[dict[str, Any]]
 ```
+
+Retry and rate-limit handling is implemented in the underlying `LLMProvider` (see 11.3).
+The client itself focuses on request scheduling and concurrency.
 
 ---
 
@@ -577,8 +581,9 @@ Concurrency is centralized inside `LLMClient`.
 Responsibilities:
 
 * request queue,
-* worker scheduling,
-* retry handling.
+* worker scheduling (semaphore-based concurrency limiting).
+
+Retry and rate-limit handling is delegated to the `LLMProvider` layer (see §11.3).
 
 ---
 
@@ -697,10 +702,26 @@ Handled cases:
 
 Handled cases:
 
-* timeout,
-* rate limit,
-* malformed response,
-* retry exhaustion.
+| Error Type | Handling | Retry? |
+|---|---|---|
+| Rate limit (HTTP 429) | Exponential backoff, up to 3 retries | Yes |
+| Timeout (APITimeoutError) | Exponential backoff, up to 3 retries | Yes |
+| Connection drop (APIConnectionError) | Exponential backoff, up to 3 retries | Yes |
+| Server error (5xx / InternalServerError) | Exponential backoff, up to 3 retries | Yes |
+| Authentication failure (HTTP 401) | Reported immediately with actionable message | No |
+| Bad request (HTTP 400) | Reported immediately with actionable message | No |
+| Permission denied (HTTP 403) | Reported immediately with actionable message | No |
+| Malformed response | Handled by adapter (JSON parse fallback to plain text) | No |
+| Retry exhaustion (all 3 attempts failed) | Raised as `RuntimeError` with descriptive message | — |
+
+All errors are wrapped in user-friendly `RuntimeError` messages that describe the likely cause and
+suggest next steps. Errors propagate through the adapter layer, which converts them to `{"error": ...}`
+dicts consumed by `AnalysisService` and displayed via the Streamlit UI.
+
+### Per-issue isolation
+
+Individual analysis failures never block the rest of the batch. `AnalysisService` catches per-issue
+errors, saves them as `failed` state in the repository, and continues processing remaining issues.
 
 ---
 

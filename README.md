@@ -114,10 +114,30 @@ Open the UI at `http://localhost:8501`.
 
 ## Environment variables
 
+### LLM Provider
+
 - `LLM_PROVIDER_TYPE`: `fake` or `openai-compatible` (default: `fake`)
-- `LLM_API_KEY`: key for OpenAI-compatible providers
-- `LLM_BASE_URL`: API endpoint for OpenAI-compatible providers
-- `LLM_MODEL`: model name for LLM requests
+- `LLM_API_KEY`: API key for OpenAI-compatible providers
+- `LLM_BASE_URL`: API endpoint for OpenAI-compatible providers (default: `http://localhost:8000/v1`)
+- `LLM_MODEL`: model name for LLM requests (default: `default-model`)
+- `LLM_REASONING_EFFORT`: reasoning/thinking mode — `none`, `low`, `medium`, `high` (default: `none`)
+  - `none` — no thinking tokens. Sends `think: false` (Ollama native, harmlessly ignored by others).
+  - `low`/`medium`/`high` — sends `reasoning_effort` parameter (OpenAI o-series, LLama, etc.).
+- `LLM_FAKE_SCENARIO`: scenario name for fake provider responses — `default`, `reset`, `risk`, `task` (default: `default`)
+
+### Retry & Error Handling
+
+The OpenAI-compatible provider automatically retries transient API errors:
+- **Rate limits** (HTTP 429), **timeouts**, **connection drops**, and **server errors** (5xx) are retried up to **3 times** with exponential backoff (1s → 2s → 4s).
+- **Authentication failures**, **bad requests**, and **permission errors** are reported immediately without retry.
+- All errors are wrapped in descriptive, actionable messages and surfaced in the UI.
+
+### Logging
+
+- `LOG_LLM_PROMPTS`: set to `true` to log full LLM request/response payloads (default: `false`)
+
+### Jira
+
 - `JIRA_SERVER_URL`, `JIRA_USERNAME`, `JIRA_API_TOKEN`: Jira credentials
 
 ## Project structure
