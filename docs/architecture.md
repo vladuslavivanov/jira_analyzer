@@ -20,6 +20,9 @@ Jira AI Analyzer is built as a lightweight modular monolith for AI-driven Jira i
     (rate limits, timeouts, connection drops, 5xx). Non-retryable errors (auth, bad request, permission) are
     reported immediately with clear, actionable messages.
 - **Jira client / task repository**: fetches and normalizes issues from Jira or local data sources.
+  - The Jira client implements automatic retry with exponential backoff for transient errors
+    (rate limits, 5xx, connection drops, timeouts). Non-retryable errors (auth, not found,
+    bad request, permission denied) are reported immediately with clear, actionable messages.
 - **Mock Jira service**: optional local Jira-compatible API for offline development.
 
 ## Behavior summary

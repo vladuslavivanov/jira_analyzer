@@ -34,6 +34,9 @@ class JiraTasksRepository(TasksRepository):
         try:
             issue = self.client.get_issue(task_id)
             return jira_issue_to_analysis_input(issue)
+        except RuntimeError:
+            # Pass through descriptive messages from JiraTaskClient
+            raise
         except Exception as e:
             raise ValueError(f"Failed to fetch Jira issue {task_id}: {str(e)}")
 
@@ -41,6 +44,9 @@ class JiraTasksRepository(TasksRepository):
         try:
             issues = self.client.search_issues(jql, max_results=max_results)
             return [jira_issue_to_analysis_input(issue) for issue in issues]
+        except RuntimeError:
+            # Pass through descriptive messages from JiraTaskClient
+            raise
         except Exception as e:
             raise ValueError(f"Failed to search Jira issues with JQL '{jql}': {str(e)}")
 

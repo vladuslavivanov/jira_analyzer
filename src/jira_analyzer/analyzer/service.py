@@ -167,7 +167,7 @@ class AnalysisService:
             if exclude_closed:
                 issues = [issue for issue in issues if not self._is_closed_status(issue)]
             return self.analyze_issues(issues)
-        except ValueError as e:
+        except (ValueError, RuntimeError) as e:
             return [{"error": str(e)}]
         except Exception as e:
             return [{"error": f"Unexpected error during JQL analysis: {str(e)}"}]
@@ -193,7 +193,7 @@ class AnalysisService:
             repository = self._resolve_task_repository()
             issues = repository.load_dataset(path)
             return self.analyze_issues(issues)
-        except ValueError as e:
+        except (ValueError, RuntimeError) as e:
             return [{"error": str(e)}]
         except Exception as e:
             return [{"error": f"Unexpected error during dataset analysis: {str(e)}"}]

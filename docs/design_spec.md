@@ -682,9 +682,20 @@ Includes:
 
 Handled cases:
 
-* invalid credentials,
-* invalid JQL,
-* unavailable API.
+| Error Type | Handling | Retry? |
+|---|---|---|
+| Rate limit (HTTP 429) | Exponential backoff, up to 3 retries | Yes |
+| Server error (5xx) | Exponential backoff, up to 3 retries | Yes |
+| Connection drop / DNS failure | Exponential backoff, up to 3 retries | Yes |
+| Timeout | Exponential backoff, up to 3 retries | Yes |
+| Invalid credentials (HTTP 401) | Reported immediately with actionable message | No |
+| Bad request / invalid JQL (HTTP 400) | Reported immediately with actionable message | No |
+| Permission denied (HTTP 403) | Reported immediately with actionable message | No |
+| Resource not found (HTTP 404) | Reported immediately with actionable message | No |
+| Retry exhaustion (all 3 attempts failed) | Raised as `RuntimeError` with descriptive message | — |
+
+All errors are wrapped in user-friendly `RuntimeError` messages that describe the likely
+cause and suggest next steps (e.g. check credentials, verify server URL, check network).
 
 ---
 
