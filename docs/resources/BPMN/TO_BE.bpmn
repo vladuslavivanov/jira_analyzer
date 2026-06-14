@@ -1,285 +1,155 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" xmlns:modeler="http://camunda.org/schema/modeler/1.0" id="Definitions_ToBe_JiraAnalyzer" targetNamespace="http://bpmn.io/schema/bpmn" exporter="Camunda Modeler" exporterVersion="5.47.0" modeler:executionPlatform="Camunda Cloud" modeler:executionPlatformVersion="8.9.0">
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" xmlns:modeler="http://camunda.org/schema/modeler/1.0" id="Definitions_ToBe_JiraAnalyzer" targetNamespace="http://bpmn.io/schema/bpmn" exporter="Camunda Modeler" exporterVersion="5.48.0" modeler:executionPlatform="Camunda Cloud" modeler:executionPlatformVersion="8.9.0">
+  <bpmn:collaboration id="Collaboration_18hcodb">
+    <bpmn:participant id="Participant_18646mu" name="Проектный офис" processRef="Process_ToBe_JiraAnalyzer" />
+  </bpmn:collaboration>
   <bpmn:process id="Process_ToBe_JiraAnalyzer" name="TO-BE: Анализ задач через Jira Analyzer" isExecutable="true">
     <bpmn:laneSet id="LaneSet_1">
-      <bpmn:lane id="Lane_Jira" name="Jira">
-        <bpmn:flowNodeRef>Task_ReturnIssues</bpmn:flowNodeRef>
-      </bpmn:lane>
-      <bpmn:lane id="Lane_Analyzer" name="Jira Analyzer">
-        <bpmn:flowNodeRef>Task_AnalyzeIssues</bpmn:flowNodeRef>
-        <bpmn:flowNodeRef>Task_ShowAnalysisResults</bpmn:flowNodeRef>
-        <bpmn:flowNodeRef>Task_SaveEditedResult</bpmn:flowNodeRef>
-        <bpmn:flowNodeRef>Task_GenerateReport</bpmn:flowNodeRef>
-        <bpmn:flowNodeRef>Task_SendJiraRequest</bpmn:flowNodeRef>
-      </bpmn:lane>
-      <bpmn:lane id="Lane_User" name="Пользователь">
-        <bpmn:flowNodeRef>Task_ReviewResult</bpmn:flowNodeRef>
-        <bpmn:flowNodeRef>Task_EditResult</bpmn:flowNodeRef>
-        <bpmn:flowNodeRef>Task_ExportReport</bpmn:flowNodeRef>
+      <bpmn:lane id="Lane_0ut6obu" name="Пользователь">
+        <bpmn:flowNodeRef>StartEvent_1</bpmn:flowNodeRef>
         <bpmn:flowNodeRef>Task_OpenAnalyzer</bpmn:flowNodeRef>
         <bpmn:flowNodeRef>Task_SetJql</bpmn:flowNodeRef>
-        <bpmn:flowNodeRef>Task_ClickCheck</bpmn:flowNodeRef>
-        <bpmn:flowNodeRef>Gateway_ResultCorrect</bpmn:flowNodeRef>
-        <bpmn:flowNodeRef>Gateway_MoreResults</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_ExportReport</bpmn:flowNodeRef>
         <bpmn:flowNodeRef>EndEvent_1</bpmn:flowNodeRef>
-        <bpmn:flowNodeRef>StartEvent_1</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="Lane_1vrqvuj" name="Jira Analyzer">
+        <bpmn:flowNodeRef>Task_SendJiraRequest</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Activity_1v1qpsc</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_AnalyzeIssues</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_ShowAnalysisResults</bpmn:flowNodeRef>
       </bpmn:lane>
     </bpmn:laneSet>
-    <bpmn:startEvent id="StartEvent_1" name="Нужно проанализ-ть задачи Jira">
+    <bpmn:startEvent id="StartEvent_1" name="Запрос на анализ задач">
       <bpmn:outgoing>Flow_1</bpmn:outgoing>
     </bpmn:startEvent>
-    <bpmn:task id="Task_OpenAnalyzer" name="Открыть Jira Analyzer">
+    <bpmn:task id="Task_OpenAnalyzer" name="Определить набор задач для анализа">
       <bpmn:incoming>Flow_1</bpmn:incoming>
       <bpmn:outgoing>Flow_0q00f9e</bpmn:outgoing>
     </bpmn:task>
-    <bpmn:task id="Task_SetJql" name="Указать JQL для фильтрации задач">
+    <bpmn:task id="Task_SetJql" name="Запустить анализ для выбранного набора задач">
       <bpmn:incoming>Flow_0q00f9e</bpmn:incoming>
-      <bpmn:outgoing>Flow_4</bpmn:outgoing>
+      <bpmn:outgoing>Flow_11tw7ck</bpmn:outgoing>
     </bpmn:task>
-    <bpmn:task id="Task_ClickCheck" name="Нажать кнопку проверки">
-      <bpmn:incoming>Flow_4</bpmn:incoming>
-      <bpmn:outgoing>Flow_5</bpmn:outgoing>
-    </bpmn:task>
-    <bpmn:task id="Task_SendJiraRequest" name="Запросить задачи по JQL">
-      <bpmn:incoming>Flow_5</bpmn:incoming>
+    <bpmn:task id="Task_SendJiraRequest" name="Получить информацию о каждой задаче из набора">
+      <bpmn:incoming>Flow_11tw7ck</bpmn:incoming>
       <bpmn:outgoing>Flow_7</bpmn:outgoing>
     </bpmn:task>
-    <bpmn:task id="Task_ReturnIssues" name="Вернуть список задач">
-      <bpmn:incoming>Flow_7</bpmn:incoming>
-      <bpmn:outgoing>Flow_9</bpmn:outgoing>
+    <bpmn:task id="Activity_1v1qpsc" name="Сформировать отчет&#10;по всем задачам">
+      <bpmn:incoming>Flow_11</bpmn:incoming>
+      <bpmn:outgoing>Flow_0pz0j82</bpmn:outgoing>
     </bpmn:task>
-    <bpmn:task id="Task_AnalyzeIssues" name="Проанализировать задачи через LLM">
-      <bpmn:incoming>Flow_9</bpmn:incoming>
+    <bpmn:task id="Task_AnalyzeIssues" name="Проанализировать каждую задачу по критериям">
+      <bpmn:incoming>Flow_7</bpmn:incoming>
       <bpmn:outgoing>Flow_10</bpmn:outgoing>
     </bpmn:task>
-    <bpmn:task id="Task_ShowAnalysisResults" name="Показать результаты анализа">
+    <bpmn:task id="Task_ShowAnalysisResults" name="Сохранить результаты">
       <bpmn:incoming>Flow_10</bpmn:incoming>
       <bpmn:outgoing>Flow_11</bpmn:outgoing>
     </bpmn:task>
-    <bpmn:task id="Task_ReviewResult" name="Проверить результат анализа задачи">
-      <bpmn:incoming>Flow_11</bpmn:incoming>
-      <bpmn:incoming>Flow_18</bpmn:incoming>
-      <bpmn:outgoing>Flow_12</bpmn:outgoing>
-    </bpmn:task>
-    <bpmn:exclusiveGateway id="Gateway_ResultCorrect" name="Результат корректен?">
-      <bpmn:incoming>Flow_12</bpmn:incoming>
-      <bpmn:outgoing>Flow_13_Yes</bpmn:outgoing>
-      <bpmn:outgoing>Flow_13_No</bpmn:outgoing>
-    </bpmn:exclusiveGateway>
-    <bpmn:task id="Task_EditResult" name="Отредактировать результат анализа">
-      <bpmn:incoming>Flow_13_No</bpmn:incoming>
-      <bpmn:outgoing>Flow_14</bpmn:outgoing>
-    </bpmn:task>
-    <bpmn:task id="Task_SaveEditedResult" name="Сохранить исправленный результат">
-      <bpmn:incoming>Flow_14</bpmn:incoming>
-      <bpmn:outgoing>Flow_15</bpmn:outgoing>
-    </bpmn:task>
-    <bpmn:exclusiveGateway id="Gateway_MoreResults" name="Есть еще результаты?">
-      <bpmn:incoming>Flow_13_Yes</bpmn:incoming>
-      <bpmn:incoming>Flow_15</bpmn:incoming>
-      <bpmn:outgoing>Flow_18</bpmn:outgoing>
-      <bpmn:outgoing>Flow_16</bpmn:outgoing>
-    </bpmn:exclusiveGateway>
-    <bpmn:task id="Task_GenerateReport" name="Сформировать отчет">
-      <bpmn:incoming>Flow_16</bpmn:incoming>
-      <bpmn:outgoing>Flow_17</bpmn:outgoing>
-    </bpmn:task>
     <bpmn:task id="Task_ExportReport" name="Экспортировать отчет">
-      <bpmn:incoming>Flow_17</bpmn:incoming>
+      <bpmn:incoming>Flow_0pz0j82</bpmn:incoming>
       <bpmn:outgoing>Flow_19</bpmn:outgoing>
     </bpmn:task>
     <bpmn:endEvent id="EndEvent_1" name="Отчет экспортирован">
       <bpmn:incoming>Flow_19</bpmn:incoming>
     </bpmn:endEvent>
     <bpmn:sequenceFlow id="Flow_1" sourceRef="StartEvent_1" targetRef="Task_OpenAnalyzer" />
-    <bpmn:sequenceFlow id="Flow_4" sourceRef="Task_SetJql" targetRef="Task_ClickCheck" />
-    <bpmn:sequenceFlow id="Flow_7" sourceRef="Task_SendJiraRequest" targetRef="Task_ReturnIssues" />
-    <bpmn:sequenceFlow id="Flow_9" sourceRef="Task_ReturnIssues" targetRef="Task_AnalyzeIssues" />
-    <bpmn:sequenceFlow id="Flow_10" sourceRef="Task_AnalyzeIssues" targetRef="Task_ShowAnalysisResults" />
-    <bpmn:sequenceFlow id="Flow_11" sourceRef="Task_ShowAnalysisResults" targetRef="Task_ReviewResult" />
-    <bpmn:sequenceFlow id="Flow_12" sourceRef="Task_ReviewResult" targetRef="Gateway_ResultCorrect" />
-    <bpmn:sequenceFlow id="Flow_13_Yes" name="Да" sourceRef="Gateway_ResultCorrect" targetRef="Gateway_MoreResults" />
-    <bpmn:sequenceFlow id="Flow_13_No" name="Нет" sourceRef="Gateway_ResultCorrect" targetRef="Task_EditResult" />
-    <bpmn:sequenceFlow id="Flow_14" sourceRef="Task_EditResult" targetRef="Task_SaveEditedResult" />
-    <bpmn:sequenceFlow id="Flow_15" sourceRef="Task_SaveEditedResult" targetRef="Gateway_MoreResults" />
-    <bpmn:sequenceFlow id="Flow_18" name="Да" sourceRef="Gateway_MoreResults" targetRef="Task_ReviewResult" />
-    <bpmn:sequenceFlow id="Flow_16" name="Нет" sourceRef="Gateway_MoreResults" targetRef="Task_GenerateReport" />
-    <bpmn:sequenceFlow id="Flow_17" sourceRef="Task_GenerateReport" targetRef="Task_ExportReport" />
-    <bpmn:sequenceFlow id="Flow_19" sourceRef="Task_ExportReport" targetRef="EndEvent_1" />
     <bpmn:sequenceFlow id="Flow_0q00f9e" sourceRef="Task_OpenAnalyzer" targetRef="Task_SetJql" />
-    <bpmn:sequenceFlow id="Flow_5" sourceRef="Task_ClickCheck" targetRef="Task_SendJiraRequest" />
+    <bpmn:sequenceFlow id="Flow_11tw7ck" sourceRef="Task_SetJql" targetRef="Task_SendJiraRequest" />
+    <bpmn:sequenceFlow id="Flow_7" sourceRef="Task_SendJiraRequest" targetRef="Task_AnalyzeIssues" />
+    <bpmn:sequenceFlow id="Flow_11" sourceRef="Task_ShowAnalysisResults" targetRef="Activity_1v1qpsc" />
+    <bpmn:sequenceFlow id="Flow_0pz0j82" sourceRef="Activity_1v1qpsc" targetRef="Task_ExportReport" />
+    <bpmn:sequenceFlow id="Flow_10" sourceRef="Task_AnalyzeIssues" targetRef="Task_ShowAnalysisResults" />
+    <bpmn:sequenceFlow id="Flow_19" sourceRef="Task_ExportReport" targetRef="EndEvent_1" />
   </bpmn:process>
   <bpmndi:BPMNDiagram id="BPMNDiagram_1">
-    <bpmndi:BPMNPlane id="BPMNPlane_1" bpmnElement="Process_ToBe_JiraAnalyzer">
-      <bpmndi:BPMNShape id="Lane_Jira_di" bpmnElement="Lane_Jira" isHorizontal="true">
-        <dc:Bounds x="156" y="430" width="2994" height="150" />
+    <bpmndi:BPMNPlane id="BPMNPlane_1" bpmnElement="Collaboration_18hcodb">
+      <bpmndi:BPMNShape id="Participant_18646mu_di" bpmnElement="Participant_18646mu" isHorizontal="true">
+        <dc:Bounds x="153" y="180" width="1777" height="260" />
+        <bpmndi:BPMNLabel />
       </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="Lane_Analyzer_di" bpmnElement="Lane_Analyzer" isHorizontal="true">
-        <dc:Bounds x="156" y="270" width="2994" height="160" />
+      <bpmndi:BPMNShape id="Lane_0ut6obu_di" bpmnElement="Lane_0ut6obu" isHorizontal="true">
+        <dc:Bounds x="183" y="180" width="1747" height="130" />
+        <bpmndi:BPMNLabel />
       </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="Lane_User_di" bpmnElement="Lane_User" isHorizontal="true">
-        <dc:Bounds x="156" y="50" width="2994" height="220" />
+      <bpmndi:BPMNShape id="Lane_1vrqvuj_di" bpmnElement="Lane_1vrqvuj" isHorizontal="true">
+        <dc:Bounds x="183" y="310" width="1747" height="130" />
+        <bpmndi:BPMNLabel />
       </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="Task_ReturnIssues_di" bpmnElement="Task_ReturnIssues">
-        <dc:Bounds x="1150" y="465" width="160" height="80" />
+      <bpmndi:BPMNShape id="StartEvent_1_di" bpmnElement="StartEvent_1">
+        <dc:Bounds x="232" y="222" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="216" y="258" width="69" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_OpenAnalyzer_di" bpmnElement="Task_OpenAnalyzer">
+        <dc:Bounds x="350" y="200" width="140" height="80" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_SetJql_di" bpmnElement="Task_SetJql">
+        <dc:Bounds x="530" y="200" width="180" height="80" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_SendJiraRequest_di" bpmnElement="Task_SendJiraRequest">
+        <dc:Bounds x="755" y="330" width="170" height="80" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="BPMNShape_1xql5pm" bpmnElement="Activity_1v1qpsc">
+        <dc:Bounds x="1390" y="330" width="180" height="80" />
+        <bpmndi:BPMNLabel />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Task_AnalyzeIssues_di" bpmnElement="Task_AnalyzeIssues">
-        <dc:Bounds x="1345" y="310" width="190" height="80" />
+        <dc:Bounds x="955" y="330" width="190" height="80" />
         <bpmndi:BPMNLabel />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Task_ShowAnalysisResults_di" bpmnElement="Task_ShowAnalysisResults">
-        <dc:Bounds x="1570" y="310" width="180" height="80" />
-      </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="Task_ReviewResult_di" bpmnElement="Task_ReviewResult">
-        <dc:Bounds x="1780" y="135" width="180" height="80" />
-      </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="Gateway_ResultCorrect_di" bpmnElement="Gateway_ResultCorrect" isMarkerVisible="true">
-        <dc:Bounds x="1995" y="150" width="50" height="50" />
-        <bpmndi:BPMNLabel>
-          <dc:Bounds x="1991" y="210" width="58" height="27" />
-        </bpmndi:BPMNLabel>
-      </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="Task_EditResult_di" bpmnElement="Task_EditResult">
-        <dc:Bounds x="2080" y="135" width="180" height="80" />
-      </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="Task_SaveEditedResult_di" bpmnElement="Task_SaveEditedResult">
-        <dc:Bounds x="2295" y="310" width="190" height="80" />
-      </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="Gateway_MoreResults_di" bpmnElement="Gateway_MoreResults" isMarkerVisible="true">
-        <dc:Bounds x="2495" y="150" width="50" height="50" />
-        <bpmndi:BPMNLabel>
-          <dc:Bounds x="2538" y="186.5" width="64" height="27" />
-        </bpmndi:BPMNLabel>
-      </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="Task_GenerateReport_di" bpmnElement="Task_GenerateReport">
-        <dc:Bounds x="2655" y="310" width="170" height="80" />
+        <dc:Bounds x="1180" y="330" width="180" height="80" />
+        <bpmndi:BPMNLabel />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Task_ExportReport_di" bpmnElement="Task_ExportReport">
-        <dc:Bounds x="2865" y="135" width="170" height="80" />
+        <dc:Bounds x="1625" y="200" width="170" height="80" />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="EndEvent_1_di" bpmnElement="EndEvent_1">
-        <dc:Bounds x="3072" y="157" width="36" height="36" />
+        <dc:Bounds x="1852" y="222" width="36" height="36" />
         <bpmndi:BPMNLabel>
-          <dc:Bounds x="3052" y="193" width="76" height="27" />
+          <dc:Bounds x="1832" y="258" width="76" height="27" />
         </bpmndi:BPMNLabel>
       </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="Task_SendJiraRequest_di" bpmnElement="Task_SendJiraRequest">
-        <dc:Bounds x="935" y="310" width="170" height="80" />
-      </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="Task_OpenAnalyzer_di" bpmnElement="Task_OpenAnalyzer">
-        <dc:Bounds x="340" y="135" width="140" height="80" />
-      </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="Task_SetJql_di" bpmnElement="Task_SetJql">
-        <dc:Bounds x="510" y="135" width="180" height="80" />
-      </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="Task_ClickCheck_di" bpmnElement="Task_ClickCheck">
-        <dc:Bounds x="720" y="135" width="160" height="80" />
-      </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="StartEvent_1_di" bpmnElement="StartEvent_1">
-        <dc:Bounds x="222" y="157" width="36" height="36" />
-        <bpmndi:BPMNLabel>
-          <dc:Bounds x="206" y="193" width="69" height="40" />
-        </bpmndi:BPMNLabel>
-      </bpmndi:BPMNShape>
-      <bpmndi:BPMNEdge id="Flow_7_di" bpmnElement="Flow_7">
-        <di:waypoint x="1105" y="350" />
-        <di:waypoint x="1130" y="350" />
-        <di:waypoint x="1130" y="505" />
-        <di:waypoint x="1150" y="505" />
-      </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="Flow_9_di" bpmnElement="Flow_9">
-        <di:waypoint x="1310" y="505" />
-        <di:waypoint x="1328" y="505" />
-        <di:waypoint x="1328" y="350" />
-        <di:waypoint x="1345" y="350" />
-      </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="Flow_10_di" bpmnElement="Flow_10">
-        <di:waypoint x="1535" y="350" />
-        <di:waypoint x="1570" y="350" />
-      </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="Flow_11_di" bpmnElement="Flow_11">
-        <di:waypoint x="1750" y="350" />
-        <di:waypoint x="1765" y="350" />
-        <di:waypoint x="1765" y="175" />
-        <di:waypoint x="1780" y="175" />
-      </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="Flow_18_di" bpmnElement="Flow_18">
-        <di:waypoint x="2520" y="150" />
-        <di:waypoint x="2520" y="70" />
-        <di:waypoint x="1870" y="70" />
-        <di:waypoint x="1870" y="135" />
-        <bpmndi:BPMNLabel>
-          <dc:Bounds x="2528" y="133" width="14" height="14" />
-        </bpmndi:BPMNLabel>
-      </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="Flow_12_di" bpmnElement="Flow_12">
-        <di:waypoint x="1960" y="175" />
-        <di:waypoint x="1995" y="175" />
-      </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="Flow_13_Yes_di" bpmnElement="Flow_13_Yes">
-        <di:waypoint x="2020" y="150" />
-        <di:waypoint x="2020" y="110" />
-        <di:waypoint x="2450" y="110" />
-        <di:waypoint x="2450" y="175" />
-        <di:waypoint x="2495" y="175" />
-        <bpmndi:BPMNLabel>
-          <dc:Bounds x="1998" y="133" width="14" height="14" />
-        </bpmndi:BPMNLabel>
-      </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="Flow_13_No_di" bpmnElement="Flow_13_No">
-        <di:waypoint x="2045" y="175" />
-        <di:waypoint x="2080" y="175" />
-        <bpmndi:BPMNLabel>
-          <dc:Bounds x="2053" y="157" width="19" height="14" />
-        </bpmndi:BPMNLabel>
-      </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="Flow_14_di" bpmnElement="Flow_14">
-        <di:waypoint x="2260" y="175" />
-        <di:waypoint x="2278" y="175" />
-        <di:waypoint x="2278" y="350" />
-        <di:waypoint x="2295" y="350" />
-      </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="Flow_15_di" bpmnElement="Flow_15">
-        <di:waypoint x="2485" y="350" />
-        <di:waypoint x="2520" y="350" />
-        <di:waypoint x="2520" y="200" />
-      </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="Flow_16_di" bpmnElement="Flow_16">
-        <di:waypoint x="2545" y="175" />
-        <di:waypoint x="2620" y="175" />
-        <di:waypoint x="2620" y="350" />
-        <di:waypoint x="2655" y="350" />
-        <bpmndi:BPMNLabel>
-          <dc:Bounds x="2557" y="157" width="19" height="14" />
-        </bpmndi:BPMNLabel>
-      </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="Flow_17_di" bpmnElement="Flow_17">
-        <di:waypoint x="2825" y="350" />
-        <di:waypoint x="2845" y="350" />
-        <di:waypoint x="2845" y="175" />
-        <di:waypoint x="2865" y="175" />
-      </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="Flow_19_di" bpmnElement="Flow_19">
-        <di:waypoint x="3035" y="175" />
-        <di:waypoint x="3072" y="175" />
-      </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="Flow_5_di" bpmnElement="Flow_5">
-        <di:waypoint x="880" y="175" />
-        <di:waypoint x="910" y="175" />
-        <di:waypoint x="910" y="350" />
-        <di:waypoint x="935" y="350" />
-      </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Flow_1_di" bpmnElement="Flow_1">
-        <di:waypoint x="258" y="175" />
-        <di:waypoint x="340" y="175" />
+        <di:waypoint x="268" y="240" />
+        <di:waypoint x="350" y="240" />
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Flow_0q00f9e_di" bpmnElement="Flow_0q00f9e">
-        <di:waypoint x="480" y="175" />
-        <di:waypoint x="510" y="175" />
+        <di:waypoint x="490" y="240" />
+        <di:waypoint x="530" y="240" />
       </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="Flow_4_di" bpmnElement="Flow_4">
-        <di:waypoint x="690" y="175" />
-        <di:waypoint x="720" y="175" />
+      <bpmndi:BPMNEdge id="Flow_11tw7ck_di" bpmnElement="Flow_11tw7ck">
+        <di:waypoint x="710" y="240" />
+        <di:waypoint x="730" y="240" />
+        <di:waypoint x="730" y="370" />
+        <di:waypoint x="755" y="370" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_7_di" bpmnElement="Flow_7">
+        <di:waypoint x="925" y="370" />
+        <di:waypoint x="955" y="370" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_0pz0j82_di" bpmnElement="Flow_0pz0j82">
+        <di:waypoint x="1570" y="370" />
+        <di:waypoint x="1600" y="370" />
+        <di:waypoint x="1600" y="240" />
+        <di:waypoint x="1625" y="240" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_19_di" bpmnElement="Flow_19">
+        <di:waypoint x="1795" y="240" />
+        <di:waypoint x="1852" y="240" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_10_di" bpmnElement="Flow_10">
+        <di:waypoint x="1145" y="370" />
+        <di:waypoint x="1180" y="370" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_11_di" bpmnElement="Flow_11">
+        <di:waypoint x="1360" y="370" />
+        <di:waypoint x="1390" y="370" />
       </bpmndi:BPMNEdge>
     </bpmndi:BPMNPlane>
   </bpmndi:BPMNDiagram>
