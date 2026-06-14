@@ -18,13 +18,14 @@ A compact AI-powered Jira issue quality linter with a Streamlit browser interfac
    ```
 2. Create a `.env` file in the repository root for provider and Jira settings:
    ```env
-   LLM_PROVIDER_TYPE=fake
-   LLM_API_KEY=your_openai_api_key
-   LLM_BASE_URL=http://localhost:8000/v1
+   LLM_PROVIDER_TYPE=openai-compatible
+   LLM_BASE_URL=https://api.example.com/v1
    LLM_MODEL=your-model-name
+   LLM_API_KEY=your_api_key
+
    JIRA_SERVER_URL=https://jira.example.com
    JIRA_USERNAME=your-user
-   JIRA_API_TOKEN=your-token
+   JIRA_API_TOKEN=your-token # or password
    ```
 3. For local tests, use the sample input file: `data/input.json`.
 

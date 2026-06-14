@@ -1,3 +1,4 @@
+import hashlib
 import json
 import re
 from datetime import datetime, timedelta, timezone
@@ -7,8 +8,8 @@ import asyncio
 
 from jira_analyzer.analyzer.core.llm.adapter import SyncToAsyncLLMAdapter
 from jira_analyzer.analyzer.core.llm.client import LLMClient
+from jira_analyzer.analyzer.core.config import AnalysisConfig
 from jira_analyzer.analyzer.core.llm.prompt_builder import (
-    AnalysisPromptConfig,
     build_prompt_from_template,
     build_structured_prompt,
     get_default_prompt_config,
@@ -35,7 +36,7 @@ class AnalysisService:
     def __init__(
         self,
         prompt_template: str | None = None,
-        prompt_config: AnalysisPromptConfig | None = None,
+        prompt_config: AnalysisConfig | None = None,
         worker_count: int = 1,
         llm_max_workers: int | None = None,
         llm_provider: LLMProvider | None = None,
@@ -43,8 +44,7 @@ class AnalysisService:
         task_repository: TasksRepository | None = None,
         repo: AnalysisResultRepository | None = None,
         run_id: int | None = None,
-        reasoning_enabled: bool = False,
-        reasoning_effort: str = "high",
+        reasoning_effort: str = "none",
     ):
         self.prompt_template = prompt_template
         self.prompt_config = prompt_config
@@ -53,13 +53,12 @@ class AnalysisService:
         self.task_repository = task_repository
         self.repo = repo
         self.run_id = run_id
-        self.reasoning_enabled = reasoning_enabled
         self.reasoning_effort = reasoning_effort
 
         if self.prompt_config is None and self.prompt_template is None:
             self.prompt_config = get_default_prompt_config()
 
-        provider = llm_provider or self._resolve_default_provider(reasoning_enabled, reasoning_effort)
+        provider = llm_provider or self._resolve_default_provider(reasoning_effort)
         self.llm_client = LLMClient(
             provider=provider,
             max_workers=llm_max_workers or self.worker_count,
@@ -69,37 +68,71 @@ class AnalysisService:
         self,
         run_name: str | None = None,
     ) -> int:
-        """Create a new analysis run and store the analysis configuration."""
+        """Create a new analysis run and store the analysis configuration.
+        
+        The configuration (prompts, criteria, reasoning settings) is stored
+        in a separate config store (analysis_configs table) and deduplicated
+        by content hash. Each run is an individual session referencing a
+        config — runs never share IDs even when configs are identical.
+        
+        If no run_name is given, defaults to the current date/time.
+        """
         if not self.repo:
             raise ValueError("Repository required to create analysis run")
         
         if not self.prompt_config:
             raise ValueError("Prompt configuration required to create analysis run")
         
-        # Convert criteria to dict format for storage
-        criteria_list = [
-            {
-                "title": criterion.title,
-                "description": criterion.description,
-                "scoring_system": criterion.scoring_system,
-                "include_review": criterion.include_review,
-                "key": criterion.key,
-            }
-            for criterion in self.prompt_config.criteria
-        ]
+        # Default run_name to current datetime
+        if run_name is None:
+            run_name = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        
+        # Derive reasoning_enabled from reasoning_effort for DB storage
+        db_reasoning_enabled = self.reasoning_effort != "none"
+        
+        # Build typed config — sorts criteria deterministically for stable hash
+        sorted_criteria = sorted(
+            self.prompt_config.criteria,
+            key=lambda c: (c.key or "", c.title or ""),
+        )
+        analysis_config = AnalysisConfig(
+            system_prompt=self.prompt_config.system_prompt,
+            general_prompt=self.prompt_config.general_prompt,
+            include_overall_conclusion=self.prompt_config.include_overall_conclusion,
+            split_by_criterion=self.split_by_criterion,
+            reasoning_enabled=db_reasoning_enabled,
+            reasoning_effort=self.reasoning_effort,
+            criteria=sorted_criteria,
+        )
+        
+        # Serialize to JSON deterministically
+        config_json = analysis_config.to_json(sort_keys=True)
+        
+        # Compute hash from the same serialization (ensures consistency)
+        config_hash = hashlib.sha256(config_json.encode("utf-8")).hexdigest()
         
         # Create the analysis run
+        # The repository will store the config separately (deduplicated by hash)
+        # and create a new run referencing it.
         run_id = self.repo.create_analysis_run(
             run_name=run_name,
             system_prompt=self.prompt_config.system_prompt,
             general_prompt=self.prompt_config.general_prompt,
             include_overall_conclusion=self.prompt_config.include_overall_conclusion,
             split_by_criterion=self.split_by_criterion,
-            reasoning_enabled=self.reasoning_enabled,
+            reasoning_enabled=db_reasoning_enabled,
             reasoning_effort=self.reasoning_effort,
+            config_hash=config_hash,
+            config_json=config_json,
         )
         
-        # Store the criteria for this run
+        # Save criteria (if the run uses config-based storage, this is a no-op)
+        criteria_list = [
+            {"title": c.title, "description": c.description,
+             "scoring_system": c.scoring_system, "include_review": c.include_review,
+             "key": c.key}
+            for c in sorted_criteria
+        ]
         self.repo.save_criteria(run_id, criteria_list)
         
         # Update the service to use this run
@@ -170,22 +203,21 @@ class AnalysisService:
             return build_markdown_report(results)
         return json.dumps(results, ensure_ascii=False, indent=2)
 
-    def _resolve_default_provider(self, reasoning_enabled: bool | None = None, reasoning_effort: str | None = None) -> LLMProvider:
+    def _resolve_default_provider(self, reasoning_effort: str | None = None) -> LLMProvider:
         """Resolve default LLM provider using the new provider agnostic architecture.
         
         Uses ProviderFactory to create sync provider and wraps it in adapter
         for compatibility with the async AnalysisService infrastructure.
         
         Args:
-            reasoning_enabled: Optional override for reasoning mode
-            reasoning_effort: Optional override for reasoning effort level
+            reasoning_effort: Optional override for reasoning effort ("none", "low", "medium", "high")
         
         Returns:
             LLMProvider instance compatible with async LLMClient
         """
         try:
             # Get provider configuration from environment with optional UI overrides
-            provider_config = resolve_llm_config(reasoning_enabled, reasoning_effort)
+            provider_config = resolve_llm_config(reasoning_effort)
             
             # Create synchronous provider using factory
             sync_provider = ProviderFactory.create_provider(provider_config)
@@ -212,16 +244,16 @@ class AnalysisService:
             async with sem:
                 task_id = issue.get("key") or issue.get("jira_key") or f"local_{idx}"
                 if self.repo:
-                    await asyncio.to_thread(self.repo.update_processing, task_id)
+                    await asyncio.to_thread(self.repo.update_processing, task_id, self.run_id)
 
                 try:
                     analysis = await self._async_analyze_issue(idx=idx, total=total, issue=issue)
                     if 'error' in analysis:
                         if self.repo:
-                            await asyncio.to_thread(self.repo.save_failed, task_id, analysis['error'])
+                            await asyncio.to_thread(self.repo.save_failed, task_id, analysis['error'], self.run_id)
                     else:
                         if self.repo:
-                            await asyncio.to_thread(self.repo.save_result, task_id, analysis)
+                            await asyncio.to_thread(self.repo.save_result, task_id, analysis, self.run_id)
                     return (idx, analysis)
                 except Exception as error:
                     logger.error(f"Analysis failed for issue {idx}/{total}: {error}")
@@ -235,7 +267,7 @@ class AnalysisService:
                         "updated_at": issue.get("updated_at", ""),
                     }
                     if self.repo:
-                        await asyncio.to_thread(self.repo.save_failed, task_id, str(error))
+                        await asyncio.to_thread(self.repo.save_failed, task_id, str(error), self.run_id)
                     return (idx, failed_result)
 
         tasks = [
@@ -344,7 +376,7 @@ class AnalysisService:
             
         criteria_requests: list[tuple[str, str | None]] = []
         for criterion in self.prompt_config.criteria:
-            single_prompt_config = AnalysisPromptConfig(
+            single_prompt_config = AnalysisConfig(
                 system_prompt=self.prompt_config.system_prompt,
                 general_prompt=self.prompt_config.general_prompt,
                 criteria=[criterion],

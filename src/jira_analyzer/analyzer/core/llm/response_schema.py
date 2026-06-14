@@ -1,7 +1,7 @@
 """LLM Response Schema Definition.
 
 This module defines the exact JSON schema format expected from LLM providers
-based on the prompt_builder.py implementation and AnalysisPromptConfig dataclass.
+based on the prompt_builder.py implementation and AnalysisConfig dataclass.
 """
 
 from typing import Literal

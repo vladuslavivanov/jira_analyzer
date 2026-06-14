@@ -1,7 +1,5 @@
 """Tests for AnalysisService using new provider architecture."""
 
-from __future__ import annotations
-
 import json
 from jira_analyzer.analyzer.service import AnalysisService
 from jira_analyzer.providers import BaseLLMProvider, LLMResponse

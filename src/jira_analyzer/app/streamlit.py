@@ -1,13 +1,17 @@
 import json
 from pathlib import Path
 import os
+from typing import cast
+
+import pyjson5
 
 import pandas as pd
 import streamlit as st
 
-from jira_analyzer.analyzer.core.llm.prompt_builder import (
-    AnalysisPromptConfig,
-    CriterionConfig,
+from jira_analyzer.analyzer.core.config import (
+    AnalysisConfig,
+    CriterionDefinition,
+    ScoringSystem,
 )
 from jira_analyzer.analyzer.service import AnalysisService
 from jira_analyzer.analyzer.engine import get_default_analysis_prompt_config
@@ -50,7 +54,7 @@ def _load_translations() -> dict[str, dict[str, str]]:
     for lang_file in _TRANSLATIONS_DIR.glob("*.json"):
         lang = lang_file.stem
         with open(lang_file, encoding="utf-8") as f:
-            translations[lang] = json.load(f)
+            translations[lang] = pyjson5.load(f)
     return translations
 
 
@@ -172,65 +176,51 @@ def _filter_criteria(criteria: list[dict], query: str) -> list[tuple[int, dict]]
 def _sync_criteria_search() -> None:
     st.session_state.criteria_search = st.session_state.criteria_search_input
 
-def _build_prompt_config_export() -> dict:
-    return {
-        "version": 1,
-        "system_prompt": st.session_state.analysis_system_prompt,
-        "general_prompt": st.session_state.analysis_general_prompt,
-        "include_overall_conclusion": (
+def _build_prompt_config_export() -> AnalysisConfig:
+    criteria = [
+        CriterionDefinition(
+            title=str(c.get("title", "")),
+            description=str(c.get("description", "")),
+            scoring_system=_normalize_scoring_system(
+                c.get("scoring_system", "percent")
+            ),
+            include_review=bool(c.get("include_review", False)),
+            key=str(c.get("key", "")),
+        )
+        for c in st.session_state.analysis_criteria
+    ]
+    return AnalysisConfig(
+        version=1,
+        system_prompt=st.session_state.analysis_system_prompt,
+        general_prompt=st.session_state.analysis_general_prompt,
+        include_overall_conclusion=(
             st.session_state.analysis_include_overall_conclusion
         ),
-        "default_scoring_system": st.session_state.analysis_default_scoring_system,
-        "criteria": [
-            {
-                "title": str(criterion.get("title", "")),
-                "description": str(criterion.get("description", "")),
-                "scoring_system": _normalize_scoring_system(
-                    criterion.get("scoring_system", "percent")
-                ),
-                "include_review": bool(criterion.get("include_review", False)),
-            }
-            for criterion in st.session_state.analysis_criteria
-        ],
-    }
+        default_scoring_system=st.session_state.analysis_default_scoring_system,
+        criteria=criteria,
+    )
 
 def _normalize_prompt_config(config: dict) -> dict:
-    if not isinstance(config, dict):
-        raise ValueError("Root value must be a JSON object.")
-
-    criteria = config.get("criteria")
-    if not isinstance(criteria, list):
-        raise ValueError("Field 'criteria' must be a list.")
-
-    imported_criteria = []
-    for index, criterion in enumerate(criteria, start=1):
-        if not isinstance(criterion, dict):
-            raise ValueError(f"Criterion {index} must be an object.")
-        imported_criteria.append(
+    """Parse an imported config dict into session-state-compatible dict."""
+    parsed = AnalysisConfig.from_dict(config)
+    return {
+        "system_prompt": parsed.system_prompt,
+        "general_prompt": parsed.general_prompt,
+        "include_overall_conclusion": parsed.include_overall_conclusion,
+        "reasoning_mode": parsed.reasoning_enabled,
+        "default_scoring_system": parsed.default_scoring_system,
+        "criteria": [
             {
-                "title": str(criterion.get("title", "")),
-                "description": str(criterion.get("description", "")),
-                "scoring_system": _normalize_scoring_system(
-                    criterion.get("scoring_system", "percent")
-                ),
-                "include_review": bool(criterion.get("include_review", False)),
+                "title": c.title,
+                "description": c.description,
+                "scoring_system": c.scoring_system,
+                "include_review": c.include_review,
+                "key": c.key,
                 "selected": False,
                 "_ui_id": _new_criterion_ui_id(),
             }
-        )
-
-    default_scoring_system = _normalize_scoring_system(
-        config.get("default_scoring_system", "percent")
-    )
-    return {
-        "system_prompt": str(config.get("system_prompt", "")),
-        "general_prompt": str(config.get("general_prompt", "")),
-        "include_overall_conclusion": bool(
-            config.get("include_overall_conclusion", True)
-        ),
-        "reasoning_mode": bool(config.get("reasoning_mode", False)),
-        "default_scoring_system": default_scoring_system,
-        "criteria": imported_criteria,
+            for c in parsed.criteria
+        ],
     }
 
 def _apply_prompt_config_to_state(config: dict) -> None:
@@ -249,11 +239,11 @@ def _apply_prompt_config_to_state(config: dict) -> None:
     _ensure_criteria_ui_ids(st.session_state.analysis_criteria)
     _clear_criterion_widget_state()
 
-def _normalize_scoring_system(value) -> str:
+def _normalize_scoring_system(value: str) -> ScoringSystem:
     if value in SCORING_LABEL_BY_VALUE:
-        return value
+        return cast(ScoringSystem, value)
     if value in SCORING_OPTIONS:
-        return SCORING_OPTIONS[value]
+        return cast(ScoringSystem, SCORING_OPTIONS[value])
     raise ValueError(f"Unsupported scoring system: {value}")
 
 def _render_results_page(t, db_path: str, force_reload: bool = False) -> None:
@@ -275,15 +265,11 @@ def _render_results_page(t, db_path: str, force_reload: bool = False) -> None:
         st.error(t("results_loading_error", error=error))
         logger.exception("Results viewer error")
 
-def _render_prompt_editor(t) -> AnalysisPromptConfig:
+def _render_prompt_editor(t) -> AnalysisConfig:
     with st.expander(t("analysis_prompt"), expanded=False):
         # Integrated Import/Export configuration controls
         st.subheader(t("prompt_config_io"))
-        config_json = json.dumps(
-            _build_prompt_config_export(),
-            ensure_ascii=False,
-            indent=2,
-        )
+        config_json = _build_prompt_config_export().to_json(indent=2)
         uploaded_config = st.file_uploader(
             t("prompt_config_file"),
             type=["json"],
@@ -295,7 +281,7 @@ def _render_prompt_editor(t) -> AnalysisPromptConfig:
                 try:
                     if uploaded_config is not None:
                         st.session_state.pending_analysis_prompt_config = (
-                            _normalize_prompt_config(json.load(uploaded_config))
+                            _normalize_prompt_config(pyjson5.load(uploaded_config))
                         )
                         st.rerun()
                 except Exception as error:
@@ -366,6 +352,7 @@ def _render_prompt_editor(t) -> AnalysisPromptConfig:
                         "description": "",
                         "scoring_system": st.session_state.analysis_default_scoring_system,
                         "include_review": False,
+                        "key": "",
                         "selected": False,
                         "_ui_id": _new_criterion_ui_id(),
                     }
@@ -397,15 +384,16 @@ def _render_prompt_editor(t) -> AnalysisPromptConfig:
                 st.rerun()
 
     criteria = [
-        CriterionConfig(
+        CriterionDefinition(
             title=str(criterion.get("title", "")),
             description=str(criterion.get("description", "")),
             scoring_system=criterion.get("scoring_system", "percent"),
             include_review=bool(criterion.get("include_review", False)),
+            key=str(criterion.get("key", "")),
         )
         for criterion in st.session_state.analysis_criteria
     ]
-    return AnalysisPromptConfig(
+    return AnalysisConfig(
         system_prompt=system_prompt,
         general_prompt=general_prompt,
         criteria=criteria,
@@ -439,6 +427,7 @@ def _ensure_prompt_state() -> None:
                 "description": criterion.description,
                 "scoring_system": criterion.scoring_system,
                 "include_review": criterion.include_review,
+                "key": criterion.key or "",
                 "selected": False,
                 "_ui_id": _new_criterion_ui_id(),
             }
@@ -563,7 +552,7 @@ def _load_issues(
 
 def _load_json_issues(uploaded_file, use_sample: bool, t) -> list[dict]:
     if uploaded_file is not None:
-        data = json.load(uploaded_file)
+        data = pyjson5.load(uploaded_file)
         if not isinstance(data, list):
             raise ValueError(t("invalid_json"))
         return data
@@ -716,22 +705,14 @@ def _render_analysis_page(
         value=False,
         help=t("split_by_criterion_help"),
     )
-    
-    # LLM reasoning mode settings
-    reasoning_enabled = st.checkbox(
-        "Enable LLM Reasoning Mode",
-        value=False,
-        help="Enable DeepSeek reasoning mode for improved analysis quality (may increase response time)"
+
+    # LLM reasoning effort — single knob for model thinking/reasoning
+    reasoning_effort = st.selectbox(
+        "Reasoning Effort",
+        options=["none", "low", "medium", "high"],
+        index=0,
+        help="None: nothink mode (no thinking tokens). Low/Medium/High: enable reasoning at specified effort."
     )
-    
-    reasoning_effort = None
-    if reasoning_enabled:
-        reasoning_effort = st.selectbox(
-            "Reasoning Effort Level",
-            options=["high", "max"],
-            index=0,
-            help="Level of reasoning effort: 'high' for balanced performance, 'max' for best results (slower)"
-        )
 
     st.divider()
 
@@ -769,23 +750,15 @@ def _render_analysis_page(
                 ):
                     repo = SqliteAnalysisResultRepository(db_path)
 
-                    if source == "Jira":
-                        if jira_query_mode == "Issue key":
-                            run_name = f"Issue Analysis: {jira_issue}"
-                        else:
-                            run_name = f"JQL Analysis: {jira_jql[:50]}..."
-                    else:
-                        run_name = "JSON Dataset Analysis"
-
                     service = AnalysisService(
                         prompt_config=prompt_config,
                         worker_count=int(worker_count),
                         split_by_criterion=split_by_criterion,
                         repo=repo,
-                        reasoning_enabled=reasoning_enabled,
                         reasoning_effort=reasoning_effort,
                     )
-                    run_id = service.create_analysis_run(run_name=run_name)
+                    # No run_name passed — the service uses current datetime
+                    run_id = service.create_analysis_run()
                     st.session_state.current_run_id = run_id
                     results = service.analyze_issues(issues)
 

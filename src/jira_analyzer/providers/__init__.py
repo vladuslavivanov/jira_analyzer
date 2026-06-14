@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from typing import Dict
 
 from jira_analyzer.providers.base import BaseLLMProvider, LLMMessage, LLMResponse
@@ -20,12 +18,11 @@ class ProviderFactory:
         Config structure:
         {
             "provider_type": "openai-compatible" or "fake",
-            "api_key": "your-api-key",           # for openai-compatible only
-            "base_url": "http://localhost:8000/v1",  # for openai-compatible only
-            "model": "your-model-name",          # for openai-compatible only
-            "reasoning_enabled": false,            # optional: enable LLM reasoning
-            "reasoning_effort": "high",           # optional: reasoning level ("high", "max")
-            "default_response": "response text"  # for fake only
+            "api_key": "your-api-key",               # for openai-compatible only
+            "base_url": "http://localhost:8000/v1",   # for openai-compatible only
+            "model": "your-model-name",              # for openai-compatible only
+            "reasoning_effort": "none",               # optional: "none", "low", "medium", "high"
+            "default_response": "response text"      # for fake only
         }
         """
         provider_type = config.get("provider_type")
@@ -41,8 +38,7 @@ class ProviderFactory:
                 api_key=config["api_key"],
                 base_url=config["base_url"],
                 model=config["model"],
-                reasoning_enabled=config.get("reasoning_enabled", False),
-                reasoning_effort=config.get("reasoning_effort", "high")
+                reasoning_effort=config.get("reasoning_effort", "none"),
             )
 
         elif provider_type == "fake":

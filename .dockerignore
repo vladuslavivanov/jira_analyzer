@@ -1,0 +1,10 @@
+.env
+data/output.json
+__pycache__/
+*.pyc
+*.egg-info/
+.pytest_cache/
+pytest-cache-files-*/
+logs/
+.idea/
+.DS_Store
