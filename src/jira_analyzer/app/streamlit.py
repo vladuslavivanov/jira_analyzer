@@ -11,6 +11,7 @@ import streamlit as st
 from jira_analyzer.analyzer.core.config import (
     AnalysisConfig,
     CriterionDefinition,
+    ReasoningEffort,
     ScoringSystem,
 )
 from jira_analyzer.analyzer.service import AnalysisService
@@ -709,12 +710,12 @@ def _render_analysis_page(
     # LLM reasoning effort — single knob for model thinking/reasoning
     reasoning_effort = st.selectbox(
         t("reasoning_effort_select_label"),
-        options=["none", "low", "medium", "high"],
+        options=[e.value for e in ReasoningEffort],
         format_func=lambda x: {
-            "none": t("reasoning_effort_none"),
-            "low": t("reasoning_effort_low"),
-            "medium": t("reasoning_effort_medium"),
-            "high": t("reasoning_effort_high"),
+            ReasoningEffort.NONE: t("reasoning_effort_none"),
+            ReasoningEffort.LOW: t("reasoning_effort_low"),
+            ReasoningEffort.MEDIUM: t("reasoning_effort_medium"),
+            ReasoningEffort.HIGH: t("reasoning_effort_high"),
         }.get(x, x),
         index=0,
         help=t("reasoning_effort_select_help")
@@ -761,7 +762,7 @@ def _render_analysis_page(
                         worker_count=int(worker_count),
                         split_by_criterion=split_by_criterion,
                         repo=repo,
-                        reasoning_effort=reasoning_effort,
+                        reasoning_effort=ReasoningEffort(reasoning_effort),
                     )
                     # No run_name passed — the service uses current datetime
                     run_id = service.create_analysis_run()

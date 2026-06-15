@@ -8,7 +8,7 @@ import asyncio
 
 from jira_analyzer.analyzer.core.llm.adapter import SyncToAsyncLLMAdapter
 from jira_analyzer.analyzer.core.llm.client import LLMClient
-from jira_analyzer.analyzer.core.config import AnalysisConfig
+from jira_analyzer.analyzer.core.config import AnalysisConfig, ReasoningEffort
 from jira_analyzer.analyzer.core.llm.prompt_builder import (
     build_prompt_from_template,
     build_structured_prompt,
@@ -44,7 +44,7 @@ class AnalysisService:
         task_repository: TasksRepository | None = None,
         repo: AnalysisResultRepository | None = None,
         run_id: int | None = None,
-        reasoning_effort: str = "none",
+        reasoning_effort: ReasoningEffort = ReasoningEffort.NONE,
     ):
         self.prompt_template = prompt_template
         self.prompt_config = prompt_config
@@ -88,7 +88,7 @@ class AnalysisService:
             run_name = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         
         # Derive reasoning_enabled from reasoning_effort for DB storage
-        db_reasoning_enabled = self.reasoning_effort != "none"
+        db_reasoning_enabled = self.reasoning_effort != ReasoningEffort.NONE
         
         # Build typed config — sorts criteria deterministically for stable hash
         sorted_criteria = sorted(

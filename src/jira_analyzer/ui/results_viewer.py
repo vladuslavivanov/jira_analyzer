@@ -5,7 +5,7 @@ from typing import Any, Dict, List, Callable
 import pandas as pd
 import streamlit as st
 
-from jira_analyzer.analyzer.core.config import AnalysisConfig, CriterionDefinition
+from jira_analyzer.analyzer.core.config import AnalysisConfig, CriterionDefinition, ReasoningEffort
 from jira_analyzer.storage import SqliteAnalysisResultRepository
 
 
@@ -402,7 +402,7 @@ class ResultsViewer:
                         include_overall_conclusion=analysis_run.get("include_overall_conclusion", True),
                         split_by_criterion=analysis_run.get("split_by_criterion", False),
                         reasoning_enabled=analysis_run.get("reasoning_enabled", False),
-                        reasoning_effort=analysis_run.get("reasoning_effort", "high"),
+                        reasoning_effort=ReasoningEffort(analysis_run.get("reasoning_effort", "high")),
                         criteria=[
                             CriterionDefinition(
                                 title=c.get("title", ""),

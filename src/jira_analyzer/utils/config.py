@@ -1,6 +1,8 @@
 import os
 from dotenv import load_dotenv
 
+from jira_analyzer.analyzer.core.config import ReasoningEffort
+
 # Only load .env if it exists and don't override existing env vars set by Docker
 # This allows Docker compose environment variables to take precedence
 load_dotenv(override=False)
@@ -29,7 +31,8 @@ LOG_LLM_PROMPTS = os.getenv("LOG_LLM_PROMPTS", "false").lower() == "true"
 LLM_REASONING_EFFORT = os.getenv("LLM_REASONING_EFFORT", "none").lower()
 
 
-def resolve_llm_config(reasoning_effort: str | None = None) -> dict:
+
+def resolve_llm_config(reasoning_effort: ReasoningEffort | None = None) -> dict:
     """Resolve LLM configuration from environment variables.
     
     Args:
@@ -45,16 +48,17 @@ def resolve_llm_config(reasoning_effort: str | None = None) -> dict:
         if not LLM_API_KEY:
             raise ValueError("LLM_API_KEY not set in environment for openai-compatible provider")
         
-        final_reasoning_effort = reasoning_effort if reasoning_effort is not None else LLM_REASONING_EFFORT
-        if final_reasoning_effort not in ("none", "low", "medium", "high"):
-            final_reasoning_effort = "none"
+        raw_effort = reasoning_effort.value if isinstance(reasoning_effort, ReasoningEffort) else reasoning_effort
+        final_effort = raw_effort if raw_effort is not None else LLM_REASONING_EFFORT
+        if final_effort not in ReasoningEffort:
+            final_effort = ReasoningEffort.NONE.value
         
         return {
             "provider_type": provider_type,
             "api_key": str(LLM_API_KEY),
             "base_url": str(LLM_BASE_URL),
             "model": str(LLM_MODEL),
-            "reasoning_effort": final_reasoning_effort,
+            "reasoning_effort": final_effort,
         }
     
     elif provider_type == "fake":

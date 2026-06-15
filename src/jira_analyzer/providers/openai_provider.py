@@ -13,6 +13,7 @@ from openai import (
     APIError,
 )
 
+from jira_analyzer.analyzer.core.config import ReasoningEffort
 from jira_analyzer.providers.base import BaseLLMProvider, LLMMessage, LLMResponse
 from jira_analyzer.utils.logger import setup_logger
 from jira_analyzer.utils.config import LOG_LLM_PROMPTS
@@ -42,7 +43,7 @@ class OpenAICompatibleProvider(BaseLLMProvider):
         api_key: str,
         base_url: str,
         model: str,
-        reasoning_effort: str = "none",
+        reasoning_effort: ReasoningEffort = ReasoningEffort.NONE,
     ):
         """Initialize with connection details.
 
@@ -104,7 +105,7 @@ class OpenAICompatibleProvider(BaseLLMProvider):
             "max_tokens": max_tokens,
         }
 
-        if self._reasoning_effort == "none":
+        if self._reasoning_effort == ReasoningEffort.NONE:
             api_params["extra_body"] = {"think": False}
         else:
             api_params["reasoning_effort"] = self._reasoning_effort

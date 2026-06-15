@@ -1,5 +1,6 @@
 from typing import Dict
 
+from jira_analyzer.analyzer.core.config import ReasoningEffort
 from jira_analyzer.providers.base import BaseLLMProvider, LLMMessage, LLMResponse
 from jira_analyzer.providers.fake_provider import FakeProvider
 from jira_analyzer.providers.openai_provider import OpenAICompatibleProvider
@@ -38,7 +39,7 @@ class ProviderFactory:
                 api_key=config["api_key"],
                 base_url=config["base_url"],
                 model=config["model"],
-                reasoning_effort=config.get("reasoning_effort", "none"),
+                reasoning_effort=ReasoningEffort(config.get("reasoning_effort", "none")),
             )
 
         elif provider_type == "fake":

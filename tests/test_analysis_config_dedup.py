@@ -14,7 +14,7 @@ import re
 import sqlite3
 from pathlib import Path
 
-from jira_analyzer.analyzer.core.config import AnalysisConfig, CriterionDefinition
+from jira_analyzer.analyzer.core.config import AnalysisConfig, CriterionDefinition, ReasoningEffort
 from jira_analyzer.analyzer.service import AnalysisService
 from jira_analyzer.storage.sqlite_repository import SqliteAnalysisResultRepository
 
@@ -100,9 +100,9 @@ class TestConfigDeduplication:
         config = _make_config()
 
         svc1 = AnalysisService(prompt_config=config, repo=repo,
-                               split_by_criterion=False, reasoning_effort="high")
+                               split_by_criterion=False, reasoning_effort=ReasoningEffort.HIGH)
         svc2 = AnalysisService(prompt_config=config, repo=repo,
-                               split_by_criterion=False, reasoning_effort="high")
+                               split_by_criterion=False, reasoning_effort=ReasoningEffort.HIGH)
 
         run_id1 = svc1.create_analysis_run()
         run_id2 = svc2.create_analysis_run()
@@ -164,9 +164,9 @@ class TestConfigDeduplication:
         config = _make_config()
 
         svc_high = AnalysisService(prompt_config=config, repo=repo,
-                                   reasoning_effort="high")
+                                   reasoning_effort=ReasoningEffort.HIGH)
         svc_low = AnalysisService(prompt_config=config, repo=repo,
-                                  reasoning_effort="low")
+                                  reasoning_effort=ReasoningEffort.LOW)
 
         svc_high.create_analysis_run()
         svc_low.create_analysis_run()
@@ -324,7 +324,7 @@ class TestConfigMerging:
         )
 
         svc = AnalysisService(prompt_config=config, repo=repo,
-                              split_by_criterion=True, reasoning_effort="low")
+                              split_by_criterion=True, reasoning_effort=ReasoningEffort.LOW)
         run_id = svc.create_analysis_run()
 
         run = repo.get_analysis_run(run_id)

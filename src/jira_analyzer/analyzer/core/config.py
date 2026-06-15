@@ -2,9 +2,19 @@
 
 import json
 from dataclasses import dataclass, field, asdict
+from enum import StrEnum
 from typing import Any, Literal, Self
 
 ScoringSystem = Literal["binary", "percent", "five"]
+
+
+class ReasoningEffort(StrEnum):
+    """Reasoning effort level for LLM thinking/reasoning."""
+
+    NONE = "none"
+    LOW = "low"
+    MEDIUM = "medium"
+    HIGH = "high"
 
 
 @dataclass
@@ -43,7 +53,7 @@ class AnalysisConfig:
     created_at: str | None = None
     split_by_criterion: bool = False
     reasoning_enabled: bool = False
-    reasoning_effort: str = "high"
+    reasoning_effort: ReasoningEffort = ReasoningEffort.HIGH
 
     def to_dict(self) -> dict[str, Any]:
         """Serialize to a JSON-compatible dict (omits None values)."""
@@ -97,7 +107,7 @@ class AnalysisConfig:
             created_at=data.get("created_at"),
             split_by_criterion=bool(data.get("split_by_criterion", False)),
             reasoning_enabled=bool(reasoning_enabled),
-            reasoning_effort=str(data.get("reasoning_effort", "high")),
+            reasoning_effort=ReasoningEffort(data.get("reasoning_effort", "high")),
         )
 
 
