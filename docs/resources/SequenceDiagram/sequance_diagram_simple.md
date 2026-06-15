@@ -1,3 +1,4 @@
+```mermaid
 sequenceDiagram
     actor User as Пользователь<br/>PM / проектный офис
     participant UI as Web UI
@@ -41,3 +42,4 @@ sequenceDiagram
     Service-->>UI: Вернуть отчет и статус анализа
     UI-->>User: Показать результаты анализа
 
+```
