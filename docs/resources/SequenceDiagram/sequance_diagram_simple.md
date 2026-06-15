@@ -2,46 +2,34 @@
 
 ```mermaid
 sequenceDiagram
-    actor User as Пользователь<br/>PM / проектный офис
+    actor User as Пользователь
     participant UI as Web UI
     participant Service as Analysis Service
-    participant Adapter as Task Source Adapter
-    participant Jira as Jira / Mock Jira
-    participant Queue as Queue
-    participant Worker as LLM Worker
+    participant Jira as Jira
     participant LLM as LLM Provider
-    participant DB as SQLite / Storage
-    participant Report as Report Generator
+    participant DB as Result Storage
 
-    User->>UI: Вводит JQL / ID задачи / Parent ID
-    User->>UI: Нажимает «Запустить анализ»
+    User->>UI: Запустить анализ<br>для выбранных задач
 
-    UI->>Service: createAnalysisRequest(criteria, promptSettings)
-    Service->>DB: Создать запуск анализа
-    Service->>Adapter: Получить задачи по критерию
+    UI->>Service: Сформировать запрос<br>на анализ
+    Service->>Jira: Запросить информацию<br> про выбранные задачи
 
-    Adapter->>Jira: Запрос задач
-    Jira-->>Adapter: Список задач
-    Adapter-->>Service: summary, description, type, metadata
+    Jira-->>Service: Вернуть информацию<br>про задачи
 
     Service->>DB: Сохранить задачи со статусом PENDING
-    Service->>Queue: Положить задачи в очередь
 
     loop Для каждой задачи
-        Worker->>Queue: Забрать задачу
-        Worker->>DB: Обновить статус PROCESSING
-        Worker->>LLM: Отправить prompt + данные задачи + критерии
-        LLM-->>Worker: Оценка, диагностика, рекомендации
-        Worker->>DB: Сохранить JSON-результат
-        Worker->>DB: Обновить статус COMPLETED
+        Service->>DB: Обновить статус задачи на PROCESSING
+        Service->>LLM: Отправить prompt, данные задачи, критерии
+        LLM-->>Service: Вернуть оценку, диагностику, рекомендации
+        Service->>DB: Сохранить результат анализа задачи
+        Service->>DB: Обновить статус задачи на COMPLETED
     end
 
-    Service->>Report: Сформировать отчет
-    Report->>DB: Получить результаты анализа
-    DB-->>Report: JSON-результаты
-    Report-->>Service: Markdown-отчет + JSON
+    Service->>DB: Запросить результаты анализа задач
+    DB-->>Service: Вернуть результаты анализа задач
 
-    Service-->>UI: Вернуть отчет и статус анализа
-    UI-->>User: Показать результаты анализа
+    Service-->>UI: Вернуть отчет<br> и статус анализа
+    UI-->>User: Показать отчет
 
 ```
