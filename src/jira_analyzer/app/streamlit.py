@@ -708,10 +708,16 @@ def _render_analysis_page(
 
     # LLM reasoning effort — single knob for model thinking/reasoning
     reasoning_effort = st.selectbox(
-        "Reasoning Effort",
+        t("reasoning_effort_select_label"),
         options=["none", "low", "medium", "high"],
+        format_func=lambda x: {
+            "none": t("reasoning_effort_none"),
+            "low": t("reasoning_effort_low"),
+            "medium": t("reasoning_effort_medium"),
+            "high": t("reasoning_effort_high"),
+        }.get(x, x),
         index=0,
-        help="None: nothink mode (no thinking tokens). Low/Medium/High: enable reasoning at specified effort."
+        help=t("reasoning_effort_select_help")
     )
 
     st.divider()
