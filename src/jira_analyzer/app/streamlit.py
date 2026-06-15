@@ -281,7 +281,7 @@ def _render_prompt_editor(t) -> AnalysisConfig:
                 try:
                     if uploaded_config is not None:
                         st.session_state.pending_analysis_prompt_config = (
-                            _normalize_prompt_config(pyjson5.load(uploaded_config))
+                            _normalize_prompt_config(pyjson5.loads(uploaded_config.read().decode("utf-8")))
                         )
                         st.rerun()
                 except Exception as error:
@@ -552,7 +552,7 @@ def _load_issues(
 
 def _load_json_issues(uploaded_file, use_sample: bool, t) -> list[dict]:
     if uploaded_file is not None:
-        data = pyjson5.load(uploaded_file)
+        data = pyjson5.loads(uploaded_file.read().decode("utf-8"))
         if not isinstance(data, list):
             raise ValueError(t("invalid_json"))
         return data
