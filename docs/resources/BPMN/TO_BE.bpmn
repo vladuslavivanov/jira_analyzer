@@ -50,7 +50,7 @@
       <bpmn:incoming>Flow_0pz0j82</bpmn:incoming>
       <bpmn:outgoing>Flow_19</bpmn:outgoing>
     </bpmn:task>
-    <bpmn:endEvent id="EndEvent_1" name="Отчет экспортирован">
+    <bpmn:endEvent id="EndEvent_1" name="Отчет подготовлен">
       <bpmn:incoming>Flow_19</bpmn:incoming>
     </bpmn:endEvent>
     <bpmn:sequenceFlow id="Flow_1" sourceRef="StartEvent_1" targetRef="Task_OpenAnalyzer" />
@@ -68,12 +68,12 @@
         <dc:Bounds x="153" y="80" width="1737" height="260" />
         <bpmndi:BPMNLabel />
       </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="Lane_1vrqvuj_di" bpmnElement="Lane_1vrqvuj" isHorizontal="true">
-        <dc:Bounds x="183" y="210" width="1707" height="130" />
-        <bpmndi:BPMNLabel />
-      </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Lane_0ut6obu_di" bpmnElement="Lane_0ut6obu" isHorizontal="true">
         <dc:Bounds x="183" y="80" width="1707" height="130" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Lane_1vrqvuj_di" bpmnElement="Lane_1vrqvuj" isHorizontal="true">
+        <dc:Bounds x="183" y="210" width="1707" height="130" />
         <bpmndi:BPMNLabel />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="StartEvent_1_di" bpmnElement="StartEvent_1">
@@ -112,7 +112,7 @@
       <bpmndi:BPMNShape id="EndEvent_1_di" bpmnElement="EndEvent_1">
         <dc:Bounds x="1812" y="122" width="36" height="36" />
         <bpmndi:BPMNLabel>
-          <dc:Bounds x="1792" y="158" width="76" height="27" />
+          <dc:Bounds x="1798" y="158" width="64" height="27" />
         </bpmndi:BPMNLabel>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNEdge id="Flow_1_di" bpmnElement="Flow_1">
