@@ -232,9 +232,9 @@ def test_structured_prompt_contains_parseable_schema_for_mixed_criteria():
     assert schema["criteria"]["percent_criterion"]["review"]
     assert schema["criteria"]["five_criterion"]["scoring_system"] == "five"
     assert schema["criteria_scores"] == {
-        "binary_criterion": "0/1",
-        "percent_criterion": "0-100",
-        "five_criterion": "0-5",
+        "binary_criterion": 1,
+        "percent_criterion": 100,
+        "five_criterion": 5,
     }
     assert schema["overall_conclusion"]
 
@@ -277,9 +277,9 @@ def test_structured_prompt_uses_unique_keys_for_cyrillic_criteria():
     assert schema["criteria"]["criterion_2"]["title"] == "Измеримость"
     assert schema["criteria"]["criterion_3"]["title"] == "Соответствие типу"
     assert schema["criteria_scores"] == {
-        "criterion_1": "0/1",
-        "criterion_2": "0-100",
-        "criterion_3": "0-5",
+        "criterion_1": 1,
+        "criterion_2": 100,
+        "criterion_3": 5,
     }
 
 

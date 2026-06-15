@@ -5,9 +5,9 @@
     "percent": "0 to 100, where the value is the percent of criterion fulfillment"
   },
   "score_schema_labels": {
-    "binary": "0/1",
-    "five": "0-5",
-    "percent": "0-100"
+    "binary": 1,
+    "five": 5,
+    "percent": 100
   },
   "overall_instructions": {
     "include": "Also include the overall_conclusion field.",
