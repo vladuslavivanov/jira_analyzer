@@ -1,3 +1,5 @@
+# Simplified Sequence Diagram (for Presentation)
+
 ```mermaid
 sequenceDiagram
     actor User as Пользователь<br/>PM / проектный офис
