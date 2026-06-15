@@ -159,4 +159,4 @@ The Jira API client has the same retry policy:
 
 ## Docs
 
-See `docs/architecture.md` and `docs/sequence_diagram.md` for system design details.
+See `docs/architecture.md` and and other artifacts in `docs/` for system design details.
